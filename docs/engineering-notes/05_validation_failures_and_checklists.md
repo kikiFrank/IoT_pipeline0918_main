@@ -1,6 +1,6 @@
 # 失败案例、未闭环项、最小回归矩阵与测试清理原则
 
-> 来源：现役 `docs/已知问题后续要深究.md`、2026-10/11 各 Pipeline 验收和历史旧仓库的 `CODE_CLEANUP_AUDIT_2026-08-26.md`。这是一份**决策记录**，不是宣称所有问题已修复。具体删除决定见压缩包根目录 `FILE_DECISIONS.csv`。
+> 历史来源：整理前的 `docs/已知问题后续要深究.md`、2026-10/11 各 Pipeline 验收记录（原文与输出已删除），以及旧仓库的 `CODE_CLEANUP_AUDIT_2026-08-26.md`。本文记录历史问题边界和已经完成的清理结果，不宣称所有问题已修复。逐文件处理结果见仓库内 [实验逻辑归档](../../tests/EXPERIMENTS_ARCHIVE.md)。
 
 ## 1. 已修复但仍须回归的真实问题
 
@@ -29,15 +29,18 @@
 | ROI metadata 边界 | 旧 buffer 不可写/FLUSH/epoch 下的归属与资源回收依赖代码实现 | 故障注入、断流 teardown、异步最新帧覆盖 | **按当前实现单测** |
 | 跨服务事件有图 | Pipeline 有 snapshot service unit，但不代表所有 event 被云端保存 | 每 event_id→本地媒体→微服务登记→对象存储逐条核查 | **需要跨仓验收** |
 
-## 3. 为何当前 50 个 `tests/` 文件不应全部留下
+## 3. 本次清理最终结果（已执行）
 
-截至审计提交，`tests/` **50 个文件**，分为：
+整理前基线 `b993627` 的 `tests/` 有 50 个文件；提交 `b878219` 已完成清理：**38 个测试文件删除，12 个测试源文件/脚本保留**，另新增测试索引与实验归档 2 篇 Markdown。清理后共 14 个文件。
 
-- **真正的代码测试**：直接断言生产类/算法输出、配置、缓存/图片服务/控制 RPC。`CMakeLists.txt` 当前 `BUILD_TESTING` 分支还实际引用 `frame_cache_policy_test.cpp`、`snapshot_service_test.cpp`、`pipeline_control_test.cpp`、`siglip_worker/core_test.cpp`，并构建 SigLIP2 多个独立测试目标。删除会使相应测试配置或构建失败。
-- **复用的算法单测**：`test_yolox_ppe_postprocess.cpp` 被 PPE/Andon/1stage/raisehands 相关开发验收脚本共用；`test_gesture.cpp`、`test_color8_postprocess.cpp` 还提供专用类别/输入边界。可保留少量核心单测，但不需长期保留各阶段所有包装脚本。
-- **一次性验收包装**：`build_deploy_on_165.sh`、`run_video_round.sh`、`run_real_andon.py`、`run_acceptance.py`（特定旧布线）等主要固定了当次路径、相机、模型 hash、运行时间与结果；**实验方法归档后可作为删除候选**，实际删前要查运行脚本、外部 CI/交付流程是否还在调用。
-- **问题复现/抓包临时工具**：`controlled_rtsp_disconnect.py`、`gst_rootcause_trace.cpp`、`summarize_rtsp_pcap.py` 等，重点保留在出现真实冻结时如何隔离源、进程归属、动态 pad 事件、网络证据，而不是完整保存文件。
-- **特殊危险恢复**：`tests/codec/recover_idle_vpu.sh` 会 `modprobe -r iris_vpu`；应作为人工维护规程而非每次测试运行的普通步骤。
+| 处理 | 已执行结果 | 当前索引 |
+|---|---|---|
+| 保留核心单测 3 个 | 缓存、图片服务、控制 RPC 测试迁入 `tests/unit/`，CMake 路径已更新 | [unit 测试清单](../../tests/README.md) |
+| 保留算法单测 3 个 | PPE/Stacklight 共享源码、八类 Andon、手势；已接入 CMake/CTest 的 4 个算法目标 | [算法测试入口](../../tests/README.md) |
+| 保留 SigLIP 测试依赖 6 个 | core、harness、预处理探针、硬件基准、数值对照、隔离测试 | [SigLIP 测试入口](../../tests/README.md) |
+| 删除历史脚本 38 个 | 固定部署/现场验收、协议及组合验收、观测、Tensor 探针、抓帧抓包、故障复现与 VPU 恢复包装均已退役 | [关键逻辑与逐文件结果](../../tests/EXPERIMENTS_ARCHIVE.md) |
+
+原 10 篇 docs Markdown 与六组实验输出目录也已整理后删除。历史文件可通过 `git show b993627:<原仓库相对路径>` 查阅；当前知识库保留的是提炼后的条件、结果和经验，当前可执行入口以测试索引为准。清理不依赖仓库外 ZIP/CSV，也不代表未闭环问题已修复。
 
 ## 4. 推荐的最小验证矩阵（保留断言，不全保留启动脚本）
 
@@ -55,7 +58,7 @@
 
 只提炼**六项**，就足以未来重做实验：**（a）目的与测试基线；（b）关键输入/配置；（c）操作/断言伪代码；（d）成功和失败数据；（e）错误归因及已证伪的假设；（f）仍未验证什么**。不复制脚本里的固定 IP、账户、构建机绝对路径、`sleep` 重试循环、测试日志复制和 `sudo kill` 包装。
 
-例如 `run_video_acceptance.sh` 和 `verify_video_round.py`，应只保存：
+已退役的历史脚本 `run_video_acceptance.sh` 和 `verify_video_round.py` 的关键断言已收入 [实验逻辑归档](../../tests/EXPERIMENTS_ARCHIVE.md)，例如：
 
 ```python
 # 历史测试断言逻辑（示意，不是可直接运行的 Python 脚本）
@@ -71,16 +74,17 @@ assert 'ANDON_BINDING_ERROR' not in runtime_log
 assert stopped_cleanly and iris_refcnt == 0
 ```
 
-相对地，`test_yolox_ppe_postprocess.cpp` 或 `snapshot_service_test.cpp` 直接固定了算法与代码契约，是可以随着源码变更持续运行的测试：只写一段 Markdown **不能替代回归**。
+当前保留的 [PPE/Stacklight 测试](../../tests/ppe/test_yolox_ppe_postprocess.cpp) 和 [图片服务测试](../../tests/unit/snapshot_service_test.cpp) 直接固定算法与代码契约，可以随着源码变更持续运行：只写一段 Markdown **不能替代回归**。
 
-## 6. 删除前的五个硬门槛
+## 6. 清理后的验证与后续维护
 
-1. **先在本地独立克隆/打 tag 或 mirror 备份**，不是靠 GitHub 的可见当前文件树保证所有历史可复现。
-2. 以审计 SHA 与你本地 `git rev-parse HEAD` 比对，确认没有未提交文件、未 push 的 `docs/`/`tests/` 和其它项目对脚本的调用。
-3. 从 `CMakeLists.txt`、`scripts/siglip/run_board_tests.sh` 等直接调用处解除依赖，并检查所有 `scripts/`、文档、CI 对路径的引用；不可先删被引用文件。
-4. 对留下的核心测试在板端运行一次适配当前源码的 CMake/CTest 和关键部署烟测；非覆盖范围必须注明。
-5. 确认新 Markdown 已保存必要历史数字、未通过项目、截图的可追溯性。确定不需要原始审计证据后，再通过**单独的 Git commit**清理 `docs/*validation*/` 等输出目录。
+- CMake 已使用 `tests/unit/` 的新路径；保留算法测试已接入 CTest，`scripts/siglip/run_board_tests.sh` 已补齐对应构建目标。
+- 清理时实际运行通过八类 Andon、PPE、Stacklight、帧缓存四项测试，并检查了保留 Python 的语法和测试文件路径；完整板端 CTest、手势及 SigLIP 硬件测试未在该次整理环境执行。不要把文件整理完成写成全部硬件验收通过。
+- 后续新增功能或 Bug 修复按 [tests 任务目录规范](../../tests/README.md) 建立独立功能目录，集中保存当次脚本、各轮日志、结果和报告；任务完成后提炼知识，保留必要回归，清理无用实验产物。
+- 本文的失败与未闭环项继续按实际验证结果维护，不因对应历史脚本删除而改为“已解决”。
 
-### 来源
+### 历史来源与当前维护入口
 
-当前：`docs/已知问题后续要深究.md` 与其余 9 份现役技术文档；`CMakeLists.txt`、`scripts/siglip/run_board_tests.sh`、`tests/*`。历史：`IoT_pipeline_0918:CODE_CLEANUP_AUDIT_2026-08-26.md`、`plan/build_record.md` 及现役仓库可查的旧提交。
+- 历史来源（整理前文件，已删除）：`docs/已知问题后续要深究.md` 与原有其它 9 篇技术文档，可在本仓库 `b993627` 查阅。
+- 当前维护入口：[CMakeLists.txt](../../CMakeLists.txt)、[SigLIP 板端测试](../../scripts/siglip/run_board_tests.sh)、[测试索引](../../tests/README.md)、[逐文件清理结果](../../tests/EXPERIMENTS_ARCHIVE.md)。
+- 旧仓库历史来源（非本仓库当前路径）：`IoT_pipeline_0918` `486d0c3` 的 `CODE_CLEANUP_AUDIT_2026-08-26.md` 与 `plan/build_record.md`。

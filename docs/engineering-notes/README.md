@@ -1,6 +1,6 @@
 # AI Box Pipeline：精选工程知识库
 
-> 审计基线：`kikiFrank/IoT_pipeline0918_simplify` `master@b993627`（2026-11-08）。历史工程经验来自 `IoT_pipeline_0918` `main@486d0c3`。本文档集是对当前项目文档、已验收实验和旧仓库经验的重写提炼，不是原始日志备份。
+> 整理前审计基线：`kikiFrank/IoT_pipeline0918_simplify` `b993627`；清理结果已记录于提交 `b878219`（2026-11-08）。旧仓库经验的历史来源为 `IoT_pipeline_0918` `486d0c3`。本文档集提炼历史实验与工程经验，不是原始日志备份。
 
 | 文档 | 内容 |
 |---|---|
@@ -12,13 +12,18 @@
 
 ## 原始 docs 的处理
 
-本知识库已经吸收当前仓库原有 10 篇 Markdown 的重要技术内容。原 `docs/SigLIP2_Worker_Runbook.md` 的部署入口、成功标记、停止语义、配置路径、模型 SHA、durable、outbox/failures、幂等/ACK、构建测试命令和验收边界已合并到 `03_siglip_worker_webrtc_debug.md`。审核新版后，原 10 篇 Markdown（包括 Runbook 和 Model Notes）可以删除，不需要继续维护双份文档。
+原 10 篇 Markdown 已整理后删除，包括原 `docs/SigLIP2_Worker_Runbook.md` 和 Model Notes。Runbook 的部署入口、成功标记、停止语义、配置路径、模型 SHA、durable、outbox/failures、幂等/ACK、构建测试命令和验收边界已合并到 [Worker 专题](03_siglip_worker_webrtc_debug.md)。
 
-六组实验输出目录中的原始日志、截图、probe、DOT 和 JSON 已提炼关键结论。用户已确认这些实验已验收，原始日志/截图也要删除，不需要外部备份。新文档保留关键条件和结论，不声称替代原始取证材料。
+六组实验输出目录中的原始日志、截图、probe、DOT 和 JSON 已提炼关键结论，原目录已删除。文中引用的本仓库已清理路径标为“历史来源（整理前文件，已删除）”，不是当前工作区文件或可打开的证据链接；需要查阅整理前内容时，可使用 `git show b993627:<原仓库相对路径>`。旧仓库路径另标历史来源，不属于本仓库当前文件树。
 
 ## tests 的原则
 
-不新增重复的测试脚本。`tests/` 只保留 CMake/CTest 硬依赖、现役 SigLIP 测试入口依赖和少量长期算法/协议回归；固定路径的一次性部署、实验包装、Tensor 探针、抓帧抓包与未结案故障复现工具，在关键逻辑和结果已写入文档后按清单删除。逐文件处理见 ZIP 根目录 `FILE_DECISIONS.csv` 与 `REVIEW_BEFORE_APPLY.md`。
+本次清理最终结果：原 50 个测试文件中，**38 个已删除、12 个测试源文件/脚本保留**，另新增 2 篇 Markdown。一次性部署、现场协议/组合验收、运行观测、Tensor 探针、抓帧抓包与故障复现工具均已退役，方法已归档；保留的是核心回归与现役 SigLIP 测试依赖。
+
+- [当前保留的测试入口与任务目录规范](../../tests/README.md)：现存路径、用途及运行方法。
+- [历史脚本方法与逐文件清理结果](../../tests/EXPERIMENTS_ARCHIVE.md)：已退役脚本的断言、实验逻辑与原 50 个文件的去向。
+
+清理结果以以上仓库内文档为准，后续维护无需查找仓库外的 ZIP、CSV 或清理建议文件。删除历史脚本不表示其对应的未闭环故障已经修复。
 
 ## 结果可信度
 

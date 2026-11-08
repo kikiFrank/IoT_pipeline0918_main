@@ -1,6 +1,6 @@
 # RTSP、编解码、多路 Pipeline、VPU：测试结果与故障归因
 
-> 当前实测来自 2026-11-02～11-03 的四路编解码/传输验收；16 路分组/VPU 样例为旧仓库 2026-07 的**历史实验**。所有路数和性能结果都要标注拓扑，不要当作芯片能力保证。
+> 本仓库历史实测来自 2026-11-02～11-03 的四路编解码/传输验收，原文和实验输出已整理后删除；16 路分组/VPU 样例为旧仓库 2026-07 的历史实验。所有路数和性能结果都要标注拓扑，不要当作芯片能力保证。
 
 ## 1. H.264 / H.265 和 RTSP TCP / UDP 是两组独立配置
 
@@ -21,9 +21,9 @@
 → 再验证实际四路视频流/模型/输出帧 → 断开重连/干净关停
 ```
 
-`tests/rtsp_transport_acceptance.py` 的负向验收实际使用了 TCP-only 上游（返回 `461 Unsupported Transport`），确保失败后**没有假装以 TCP 成功**。外部 tcpdump 会采到其它进程，必须与 `/proc/PID/fd` 和 socket 表做归属匹配。测试初期曾因应用内 GST_DEBUG 过量导致编码侧停顿或诊断断言；最后使用低干扰日志与外部抓包完成验收。**那次编码停顿原因未定位**，不能写作已经修复。
+历史脚本 `tests/rtsp_transport_acceptance.py`（已退役，方法已归档）的负向验收实际使用了 TCP-only 上游（返回 `461 Unsupported Transport`），确保失败后**没有假装以 TCP 成功**。外部 tcpdump 会采到其它进程，必须与 `/proc/PID/fd` 和 socket 表做归属匹配。测试初期曾因应用内 GST_DEBUG 过量导致编码侧停顿或诊断断言；最后使用低干扰日志与外部抓包完成验收。**那次编码停顿原因未定位**，不能写作已经修复。
 
-### 当前实测矩阵（2026-11-02）
+### 历史实测矩阵（2026-11-02）
 
 | 场景 | 当时结果 | 范围边界 |
 |---|---|---|
@@ -88,14 +88,27 @@ gst-inspect-1.0 v4l2h265dec
 
 另一个**无效实验**：文件后缀 `.mp4`，实际封装 WebM、编码 VP9，而样例固定 `qtdemux → h264parse → v4l2h264dec`；解析错误不可作为 VPU 容量样本。必须先 `ffprobe` 校验实际 codec/container。
 
-## 5. 一次性测试保留什么，不保留什么
+## 5. 历史脚本退役结果与方法归档
 
-- `tests/codec/run_acceptance.py`：保留“负向配置错误码、独立 fixture、四路 codec 匹配、重连、生产配置 hash 不变、NULL 关闭”的**验收方法**；若以后由长期回归取代，可删除该大脚本。
-- `tests/codec/run_real_andon.py`：历史 4 路 HEVC 真实流/120s，重点是“先验证**真实源**并限制结果的有效范围”；当前具体 IP 和输出目录不是可复用资产。
-- `tests/rtsp_transport_acceptance.py`：其“UDP 真协商 + TCP-only 拒绝回退 + PID/socket 归属”具有独有价值；建议保留为少数专项回归之一，直到有等价新用例。
-- `tests/codec/recover_idle_vpu.sh`：强制重载 `iris_vpu` 是**人工维护**手段，非日常验收；只保留必须先无 pipeline、无 `/dev/video32/33` 占用、`refcnt=0` 的安全规则，脚本建议移出日常 tests。
-- `tests/probe_rtsp_sources.py`、`probe_rtsp_transport.py`、`summarize_rtsp_pcap.py`、`inspect_rtsp_tcp_capture.py`：固定 12 路/一次性抓包分析可从文档复现；未被稳定回归调用时，提炼后清理。
+以下均为历史脚本，已退役并删除，测试方法与关键断言见 [实验逻辑归档](../../tests/EXPERIMENTS_ARCHIVE.md)，不是待执行的清理建议：
 
-### 来源
+- 原 `tests/codec/run_acceptance.py`：负向配置错误码、独立 fixture、四路 codec 匹配、重连、生产配置 hash 不变、NULL 关闭。
+- 原 `tests/codec/run_real_andon.py`：历史四路 HEVC 真实流/120s；先验证真实源，并限制结果的有效范围。
+- 原 `tests/rtsp_transport_acceptance.py`：UDP 真协商、TCP-only 拒绝回退、PID/socket 归属、pause/resume 与混合协议矩阵；完整现场包装已删除，不再作为当前专项回归入口。
+- 原 `tests/codec/recover_idle_vpu.sh`：强制重载 `iris_vpu` 属于人工维护方法；保留先无 Pipeline、无 `/dev/video32/33` 占用、refcnt=0 的前提，不保留普通测试脚本。
+- 原 `tests/{probe_rtsp_sources.py,probe_rtsp_transport.py,summarize_rtsp_pcap.py,inspect_rtsp_tcp_capture.py}`：源隔离、网络归属与抓包重组方法已归档。
 
-当前：`docs/H264_H265_Switch_20261102.md`、`docs/RTSP_TCP_UDP_配置切换方案_20261102.md`、`docs/1stage_andon_4cam_20261103.md`、`docs/已知问题后续要深究.md`、`tests/{codec,rtsp_transport_acceptance.py,inspect_rtsp_tcp_capture.py}`。历史：`IoT_pipeline_0918:plan/session_handoff_20260714_group_latency.md`、`plan/vpu_ceiling_mp4_20260715.md`、`plan/INDEX.md`。
+当前保留的测试入口见 [测试索引](../../tests/README.md)。后续新增协议或 codec 验证按功能建立任务目录，依据已归档断言构建适配当次环境的测试；本次删除不代表协议覆盖已由其它自动化用例替代。
+
+### 历史来源
+
+- 整理前文件（已删除）：`docs/H264_H265_Switch_20261102.md`、`docs/RTSP_TCP_UDP_配置切换方案_20261102.md`、`docs/1stage_andon_4cam_20261103.md`、`docs/已知问题后续要深究.md` 及上述历史脚本；可在本仓库 `b993627` 查阅。
+- 旧仓库历史来源（非本仓库当前路径）：`IoT_pipeline_0918` `486d0c3` 的 `plan/session_handoff_20260714_group_latency.md`、`plan/vpu_ceiling_mp4_20260715.md`、`plan/INDEX.md`。
+
+## 6. TimeMux 跳空路调度与专项回归方法
+
+**现役源码审阅**：`plugins/aiboxtimemux/gstaiboxtimemux.cpp` 中，每个 sink pad 只保留一个 `latest_buffer`；新帧覆盖尚未取走的旧帧，因此这不是无损队列。scheduler 从 `next_slot` 起按实际 slot ID 扫描，只选 `!eos && !flushing && has_buffer` 的输入；找到即取帧，再将 `next_slot` 推进到该 slot 的下一位。空路不会在轮询时各等待 200 ms。只有一轮扫描均无可用帧，才进行一次最长 `wait_timeout_ms` 的条件等待，醒来后重扫；源码初始值是 200 ms。该轮转只约束**当时有帧的输入的选择顺序**，不承诺各路等量输出、PTS 同步或 batch 同步。
+
+EOS 处理以 `all_sinks_eos()` 判断所有当前 sink pad；单路 EOS 不应阻断仍有帧的其他路。这是源码行为描述，**没有在本次整理中运行板端 RTSP/TimeMux 回归**。
+
+资料包所述旧仓库 `IoT_pipeline/test/timemux/README.md` 的 `rr/skip/eos/rtsp` 方法可作为新任务测试设计：三路均有帧时检查轮转；一路短暂出帧后变空时检查另两路持续输出；一路提前 EOS 时检查其余路；最后用隔离 RTSP 源复现。旧测试文件和运行结果未在本次工作区取得，**测试名称、历史通过状态仍待原仓库核对**。若后续增设回归，按 [测试目录规范](../../tests/README.md) 在对应功能任务目录保存脚本、日志和报告。

@@ -1,6 +1,6 @@
 # SigLIP2 Worker、WebRTC / RTSP 冻结与图形环境排障
 
-> 现役资料来自 2026-10-28/29 的 SigLIP2 Worker `Runbook` / `Model Notes` 和 2026-11 的故障记录；旧 WebRTC/Face/Weston 部分来自旧仓库 2026-08/09。**新 Worker 与旧 Face Worker 不是同一套实现**。
+> 本仓库历史资料来自 2026-10-28/29 的 SigLIP2 Worker Runbook / Model Notes 和 2026-11 的故障记录，原文已在整理后删除，运行说明已迁入本文；旧 WebRTC/Face/Weston 部分来自旧仓库 2026-08/09。**新 Worker 与旧 Face Worker 不是同一套实现**。
 
 ## 1. SigLIP2 Worker 当前的真实职责与运行边界
 
@@ -39,9 +39,9 @@ bash scripts/webrtc_stop.sh      # 统一停止
 
 当前**未通过完整业务验收**：当时没有新的生产 `alarm_ready`，原始图片也已清理；因此“真实工厂事件→微服务图片 ready→Worker outbox→云端展示”尚不能宣称闭环通过。现役版也未接入云端 embedding 上传；LanceDB 的未来业务设计不在此版本验收内。
 
-### 测试依赖提示（删除前）
+### 当前保留的测试依赖
 
-`CMakeLists.txt` 用 `BUILD_TESTING=ON` 编译 `siglip_worker/{core_test.cpp,isolated_harness.cpp,preprocess_probe.cpp,hardware_benchmark.cpp}`；`scripts/siglip/run_board_tests.sh` 又调用 `tests/siglip_worker/check_preprocess.py` 和 `run_isolated.sh`。**保留生产测试入口时，这些文件不能单独删**。它们是实际代码契约，不是“测试完就不需要”的普通日志包装。
+`CMakeLists.txt` 用 `BUILD_TESTING=ON` 编译 `tests/siglip_worker/{core_test.cpp,isolated_harness.cpp,preprocess_probe.cpp,hardware_benchmark.cpp}`；`scripts/siglip/run_board_tests.sh` 又调用 `tests/siglip_worker/check_preprocess.py` 和 `run_isolated.sh`。这 6 个文件均已保留，现存路径、用途和运行方法见 [测试索引](../../tests/README.md)。
 
 ## 4. 旧 WebRTC Face 6 路失败：对照而不是杜撰根因
 
@@ -60,23 +60,50 @@ bash scripts/webrtc_stop.sh      # 统一停止
 
 1. 记录源码/插件摘要、驱动、SDK、GStreamer factory、`GST_PLUGIN_PATH`/registry、环境变量及 Weston 实际进程所有权；不要仅根据有 `wayland-0` socket 判为 ready。
 2. 区分**上游源断开、VPU decoder 无帧、timemux 仍出帧、QNN 处理变慢、编码器停止、MediaMTX/客户端拉流失败**：每段采 `last_frame_ts/frames_in/out`。
-3. 用可控隔离源做断流复现，不直接杀真实工厂 RTSP/生产服务；原 `controlled_rtsp_disconnect.py` 的方法是创建本地多路 fixture、停止两路发行者，再检查 Pipeline 生命周期。
+3. 用可控隔离源做断流复现，不直接杀真实工厂 RTSP/生产服务；已退役的历史脚本 `controlled_rtsp_disconnect.py` 的方法是创建本地多路 fixture、停止两路发行者，再检查 Pipeline 生命周期，方法已收入 [实验逻辑归档](../../tests/EXPERIMENTS_ARCHIVE.md)。
 4. 如果业务允许短暂暂停，在确定目标进程身份后做 3 次 GDB `thread apply all bt`（间隔约 2 秒）并 detach，配合 `wchan`、fd、dmesg、GStreamer tracers。重复相同栈仅能证明采样窗口内阻塞，不能单独证明死锁。
-5. `gst_rootcause_trace.cpp` 可以捕获 pad push 耗时/错误、EOS/FLUSH 与 RTSP Timeout；作为独立 debug 插件仅用于定位，不应混入正式 Runtime 插件目录。
+5. 已退役的历史工具 `gst_rootcause_trace.cpp` 曾捕获 pad push 耗时/错误、EOS/FLUSH 与 RTSP Timeout，方法已归档。后续需要同类追踪时，在对应功能任务目录构建诊断工具，不混入正式 Runtime 插件目录。
 6. 任何建议重启 Weston/重载 iris_vpu 都需检查是否影响在线业务。过去有 root Weston 使用普通用户 `/run/user/<uid>` 的权限坑；临时 socket 出现不等于 EGL/DRM 稳定。
 
-**关键区别**：旧 Face Worker 的 latest-only mailbox、SlotPool、generation/epoch、FLUSH/EOS 竞态经验可供未来视频 ROI Worker 设计参考，但现役 SigLIP2 是 alarm.ready 驱动，不应该直接复制旧 Face 的线程/帧丢弃策略。
+**关键区别**：本仓库仍保留 `qtifaceinfer` 的 Face Worker 代码，Builder 在 `plan.face_plan.enabled` 时可条件接线；仅凭仓库源码不能断言现场正在启用该分支。SigLIP2 是独立的 `alarm_ready` 消息驱动进程，不应把 Face Worker 的 latest-only mailbox、SlotPool 或 GStreamer FLUSH/EOS 语义搬到 JetStream 告警消费路径。
 
-## 6. 历史 Face Worker 最值得留下的边界条件
+## 6. Face Worker 现存代码与历史测试的边界条件
 
 - `FREE→COPYING→QUEUED→INFERENCING→FREE`，拒绝重复回收与 stop 后提交；latest-only 淘汰必须确保在拷贝或推理中的 buffer 所有权不破坏。
 - FLUSH/EOS、超时或新 generation 后，旧序号结果不能覆盖新帧；结果发布前还有 TOCTOU 竞态，检查与最终提交应有明确同步边界。
 - NV12 单 FD、stride、UV offset 与 size 必须逐项校验；不能因初始 `gst_caps` 正确就假定 DMA 布局一定正确。
 - 所有 Worker 异常都应可观测、有上限地释放资源，不要因“再启动恢复”省略故障根因。
 
-### 来源
+### 6.1 现存代码的所有权与流代边界
 
-当前：`docs/SigLIP2_Worker_Runbook.md`、`docs/SigLIP2_Model_Notes.md`、`tests/siglip_worker/*`、`tests/{pipeline_runtime_acceptance.py,controlled_rtsp_disconnect.py,diagnose_rtsp_stall.py,gst_rootcause_trace.cpp}`。旧仓库：`test/face_accept/results/*`、`test/face_async/*`、`scripts/*weston*`；历史提交 `486d0c3`。
+现存 `plugins/qtifaceinfer/async/` 含 `slot_pool.hpp`、`face_worker.hpp`、`face_mailbox.hpp`、`result_store.hpp`、`frame_layout.hpp` 等实现；`plugins/qtifaceinfer/CMakeLists.txt` 构建插件，`GstPipelineBuilder.cpp` 只在启用 Face plan 的分支插入 `qtifaceinfer`。因此“旧 Face Worker 的经验”与“当前仓库没有这段代码”是两回事；是否运行由具体配置和板端插件状态决定。
+
+- Slot 状态按 `FREE → COPYING → QUEUED → INFERENCING → FREE` 管理。FLUSH 只能回收仍在队列里的任务，不能强行释放正在拷贝或推理的 slot；copy 后提交须再次核对 stream generation，避免旧流代任务进入新队列。
+- Mailbox 的 latest-only 策略允许淘汰待处理旧帧，以换取实时性；多摄像头隔离与轮转公平性须单独验证。不能把 capacity=1 理解为逐帧必达。
+- `FLUSH_START`、`FLUSH_STOP`、`STREAM_START`、EOS、stop/restart 各有状态边界；旧任务不得在新流代发布。推理异常释放 slot 后不能发布伪结果。
+- `ResultStore::publish_if_current()` 在最终提交边界再次检查 epoch、sequence 和基于**样本采集时间**的 TTL，避免预检查后发生 FLUSH 的 TOCTOU。TTL 边界、重复 release、NV12 单 FD/stride/UV offset/容量、mask fail-open 等都应作为未来改动的专项回归点。
+
+资料包列出旧 `IoT_pipeline_0918/test/face_async/` 的 8 个测试源、合计 52 个用例，覆盖范围如下。**本次未取得该旧测试目录或运行报告，文件名、数量和历史通过状态待原仓库核对**；当前 `tests/` 不含这套测试，不能将其写成当前 CTest 成绩，也不建议原样恢复。
+
+| 资料包所列旧测试源 | 用例数 | 值得保留的边界 |
+|---|---:|---|
+| `slot_pool_tests.cpp` | 7 | 状态转换、重复释放、忙状态禁止 reset |
+| `face_mailbox_tests.cpp` | 5 | latest-only、camera 隔离、轮转、容量、drain |
+| `face_worker_flow_tests.cpp` | 14 | FLUSH/STOP/EOS/STREAM_START、copy 竞态、异常恢复 |
+| `face_worker_concurrency_tests.cpp` | 4 | 旧 epoch 拒绝、并发生产消费、slot 复用 |
+| `result_store_tests.cpp` | 7 | TTL、sequence、generation、TOCTOU |
+| `frame_layout_tests.cpp` | 5 | FD、stride、UV offset、容量 |
+| `mask_policy_tests.cpp` | 7 | fail-open、bbox 与状态枚举 |
+| `stage_reporter_tests.cpp` | 3 | enter/leave 与嵌套计数 |
+
+`qtifaceinfer` 现存实现也不能证明所有上述边界已在当前板端通过；若对该插件继续开发，应针对当前接口重建必要回归，而不是恢复旧测试目录。
+
+### 历史来源与当前测试入口
+
+- 历史来源（整理前文件，已删除）：`docs/SigLIP2_Worker_Runbook.md`、`docs/SigLIP2_Model_Notes.md`，可在本仓库 `b993627` 查阅；运行与测试说明已迁入本文第 7 节。
+- 历史脚本（已退役，方法已归档）：原 `tests/{pipeline_runtime_acceptance.py,controlled_rtsp_disconnect.py,diagnose_rtsp_stall.py,gst_rootcause_trace.cpp}`，见 [实验逻辑归档](../../tests/EXPERIMENTS_ARCHIVE.md)。
+- 当前保留的测试入口：[SigLIP 板端测试](../../scripts/siglip/run_board_tests.sh)、[Worker 核心测试](../../tests/siglip_worker/core_test.cpp)、[隔离测试](../../tests/siglip_worker/run_isolated.sh)；完整清单见 [测试索引](../../tests/README.md)。
+- 旧仓库历史来源（非本仓库当前路径）：`IoT_pipeline_0918` `486d0c3` 的 `test/face_accept/results/*`、`test/face_async/*`、`scripts/*weston*`。
 
 ## 7. SigLIP2 Worker 现役运维 Runbook（由原 `SigLIP2_Worker_Runbook.md` 迁入）
 
