@@ -1,0 +1,419 @@
+{
+  "task": "light",
+  "target": {
+    "chip": "QCS9075",
+    "dsp_arch": "v73",
+    "qnn_soc_id": 77,
+    "configuration_evidence": "/mnt/g/Visteon/Nov_26/daily_record/11-3/one_stage_yolox_quantized/量化与165板端精度报告.md",
+    "configuration_evidence_sha256": "75e3d88f285da9c8d688bb6c9c5fd1202a494c81e05860d607eeb97d83c6efb9",
+    "board_test_this_run": false
+  },
+  "sdk_build": "v2.46.0.260424121129",
+  "graph_name": "model_float",
+  "source_onnx_sha256": "7434753944ee7645e1d884b086095ee3a5a540a23fddb9bb930da1f6959de27b",
+  "assets": {
+    "dlc": {
+      "path": "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/w8a16_run_20261121/delivery/light/yolox_s_light_w8a16.dlc",
+      "bytes": 9947388,
+      "sha256": "4dff761169da0098d12539d538ebd2abf92ee977903c343976f9881b7332d4b1"
+    },
+    "bin": {
+      "path": "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/w8a16_run_20261121/delivery/light/yolox_s_light_w8a16.bin",
+      "bytes": 9666560,
+      "sha256": "f5dae94bbfdba586cef2151d3da4db56f285350b60362bc5c343cf760213430e"
+    }
+  },
+  "class_labels_zero_based": {
+    "0": "red",
+    "1": "yellow",
+    "2": "green",
+    "3": "none"
+  },
+  "coco_categories": [
+    {
+      "id": 1,
+      "name": "red",
+      "supercategory": "light"
+    },
+    {
+      "id": 2,
+      "name": "yellow",
+      "supercategory": "light"
+    },
+    {
+      "id": 3,
+      "name": "green",
+      "supercategory": "light"
+    },
+    {
+      "id": 4,
+      "name": "none",
+      "supercategory": "light"
+    }
+  ],
+  "io": {
+    "images": {
+      "dtype": "uint16",
+      "qnn_dtype": "QNN_DATATYPE_UFIXED_POINT_16",
+      "shape": [
+        1,
+        640,
+        640,
+        3
+      ],
+      "contiguous_bytes": 2457600,
+      "scale_offset": {
+        "scale": 0.0038910505827516317,
+        "offset": 0
+      }
+    },
+    "output": {
+      "dtype": "uint16",
+      "qnn_dtype": "QNN_DATATYPE_UFIXED_POINT_16",
+      "shape": [
+        1,
+        8400,
+        9
+      ],
+      "contiguous_bytes": 151200,
+      "scale_offset": {
+        "scale": 0.0126799326390028,
+        "offset": -1348
+      }
+    }
+  },
+  "quantization": {
+    "weights_bits": 8,
+    "activations_bits": 16,
+    "bias_bits": 32,
+    "learned_layers": 83,
+    "weight_granularity": "per-channel",
+    "actual_weight_types": {
+      "sFxp_8": 83
+    },
+    "actual_activation_types": {
+      "uFxp_16": 83
+    },
+    "actual_bias_types": {
+      "sFxp_32": 83
+    },
+    "calibration": "min-max",
+    "quantizer": "legacy IrQuantizer",
+    "recipe": {
+      "argv": [
+        "qairt-quantizer",
+        "--input_dlc",
+        "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/w8a16_run_20261121/light/model_float.dlc",
+        "--input_list",
+        "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/w8a16_run_20261121/light/calibration_input_list.txt",
+        "--output_dlc",
+        "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/w8a16_run_20261121/light/candidates/legacy_pcq/model_w8a16.dlc",
+        "--target_backend",
+        "HTP",
+        "--weights_bitwidth",
+        "8",
+        "--act_bitwidth",
+        "16",
+        "--bias_bitwidth",
+        "32",
+        "--use_per_channel_quantization"
+      ],
+      "variant": "legacy_pcq",
+      "change_from_initial": "Only switch IrQuantizerV2 to legacy IrQuantizer",
+      "activation_calibration": "min-max",
+      "weight_granularity": "per-channel",
+      "selection_data": "8 fixed calibration images",
+      "target_evidence": "/mnt/g/Visteon/Nov_26/daily_record/11-3/one_stage_yolox_quantized/量化与165板端精度报告.md"
+    },
+    "float_exceptions": []
+  },
+  "quantize_formula": "q=clip(round(real/scale-offset),0,65535)",
+  "dequantize_formula": "real=(q+offset)*scale",
+  "raw_file_mode_used_for_evaluation": "qnn-net-run default FLOAT32 file input/output; automatic quantization/dequantization, do not dequantize twice.",
+  "preprocessing": "BGR 0..255 float32; top-left letterbox 640x640; integer truncation resize; OpenCV INTER_LINEAR; pad 114; NCHW ONNX / NHWC DLC file input.",
+  "postprocessing": "Decoded cx,cy,w,h pixels + obj sigmoid + 4 class sigmoid; one argmax class/anchor; score=obj*class >=0.001; class-aware NMS IoU=0.65; restore original ratio, no clipping; COCO maxDets=100.",
+  "evaluation": {
+    "onnx": {
+      "task": "light",
+      "stage": "onnx",
+      "expected": 10,
+      "successful": 10,
+      "metrics": {
+        "map50": 0.616158815450064,
+        "map50_95": 0.1940109940357548,
+        "detections": 2146,
+        "per_class": [
+          {
+            "category_id": 1,
+            "map50": 0.9999999999999999,
+            "map50_95": 0.19999999999999998,
+            "name": "red",
+            "gt_boxes": 1
+          },
+          {
+            "category_id": 2,
+            "map50": 0.0,
+            "map50_95": 0.0,
+            "name": "yellow",
+            "gt_boxes": 8
+          },
+          {
+            "category_id": 3,
+            "map50": 0.9377251173696641,
+            "map50_95": 0.4777090494826513,
+            "name": "green",
+            "gt_boxes": 138
+          },
+          {
+            "category_id": 4,
+            "map50": 0.5269101444305921,
+            "map50_95": 0.09833492666036792,
+            "name": "none",
+            "gt_boxes": 18
+          }
+        ]
+      }
+    },
+    "float_dlc": {
+      "task": "light",
+      "stage": "float_dlc",
+      "expected": 10,
+      "successful": 10,
+      "metrics": {
+        "map50": 0.616158815450064,
+        "map50_95": 0.1940109940357548,
+        "detections": 2146,
+        "per_class": [
+          {
+            "category_id": 1,
+            "map50": 0.9999999999999999,
+            "map50_95": 0.19999999999999998,
+            "name": "red",
+            "gt_boxes": 1
+          },
+          {
+            "category_id": 2,
+            "map50": 0.0,
+            "map50_95": 0.0,
+            "name": "yellow",
+            "gt_boxes": 8
+          },
+          {
+            "category_id": 3,
+            "map50": 0.9377251173696641,
+            "map50_95": 0.4777090494826513,
+            "name": "green",
+            "gt_boxes": 138
+          },
+          {
+            "category_id": 4,
+            "map50": 0.5269101444305921,
+            "map50_95": 0.09833492666036792,
+            "name": "none",
+            "gt_boxes": 18
+          }
+        ]
+      },
+      "drop_map50_pp": 0.0,
+      "drop_map50_95_pp": 0.0,
+      "repair_required": false
+    },
+    "w8a16_bin": {
+      "task": "light",
+      "stage": "w8a16_bin",
+      "expected": 10,
+      "successful": 10,
+      "metrics": {
+        "map50": 0.5826118643145556,
+        "map50_95": 0.15494600734316472,
+        "detections": 60133,
+        "per_class": [
+          {
+            "category_id": 1,
+            "map50": 0.9999999999999999,
+            "map50_95": 0.09999999999999999,
+            "name": "red",
+            "gt_boxes": 1
+          },
+          {
+            "category_id": 2,
+            "map50": 0.00016292768517358065,
+            "map50_95": 1.6292768517358065e-05,
+            "name": "yellow",
+            "gt_boxes": 8
+          },
+          {
+            "category_id": 3,
+            "map50": 0.8100798775288973,
+            "map50_95": 0.4444360229816514,
+            "name": "green",
+            "gt_boxes": 138
+          },
+          {
+            "category_id": 4,
+            "map50": 0.5202046520441518,
+            "map50_95": 0.07533171362249007,
+            "name": "none",
+            "gt_boxes": 18
+          }
+        ]
+      },
+      "drop_map50_pp": 3.354695113550843,
+      "drop_map50_95_pp": 3.906498669259009,
+      "repair_required": false
+    },
+    "final_w8a16_bin": {
+      "task": "light",
+      "stage": "final_w8a16_bin",
+      "expected": 10,
+      "successful": 10,
+      "metrics": {
+        "map50": 0.6082047157143868,
+        "map50_95": 0.1661440109223248,
+        "detections": 1854,
+        "per_class": [
+          {
+            "category_id": 1,
+            "map50": 0.9999999999999999,
+            "map50_95": 0.09999999999999999,
+            "name": "red",
+            "gt_boxes": 1
+          },
+          {
+            "category_id": 2,
+            "map50": 0.0,
+            "map50_95": 0.0,
+            "name": "yellow",
+            "gt_boxes": 8
+          },
+          {
+            "category_id": 3,
+            "map50": 0.9367442553968016,
+            "map50_95": 0.4807146218328278,
+            "name": "green",
+            "gt_boxes": 138
+          },
+          {
+            "category_id": 4,
+            "map50": 0.4960746074607461,
+            "map50_95": 0.08386142185647139,
+            "name": "none",
+            "gt_boxes": 18
+          }
+        ]
+      },
+      "drop_map50_pp": 0.7954099735677178,
+      "drop_map50_95_pp": 2.7866983113429997,
+      "repair_required": false
+    }
+  },
+  "data": {
+    "calibration_count": 128,
+    "evaluation_count": 10,
+    "calibration_gt_boxes_by_class": {
+      "red": 623,
+      "yellow": 213,
+      "green": 891,
+      "none": 1630
+    },
+    "calibration_source_splits": {
+      "val": 69,
+      "test": 59
+    },
+    "evaluation_source_splits": {
+      "val": 7,
+      "test": 3
+    },
+    "same_decoded_pixels_between_calibration_and_evaluation": 0,
+    "calibration_source_groups_inferred_from_filename": {
+      "frank_labeled__S2": 42,
+      "frank_labeled__S4_complete": 59,
+      "kevin_labeled__leave_post": 27
+    },
+    "evaluation_source_groups_inferred_from_filename": {
+      "kevin_labeled__leave_post": 7,
+      "kevin_labeled__others": 3
+    },
+    "shared_source_groups": [
+      "kevin_labeled__leave_post"
+    ],
+    "independent_scene_generalization_verified": false,
+    "note": "User-provided folders were used as supplied. Distinct images may come from adjacent frames of the same video. Evaluation includes original validation images used during checkpoint selection."
+  },
+  "verification": {
+    "conversion": "passed",
+    "encoding_audit": "passed",
+    "host_smoke": "passed",
+    "full_10_image_final_bin_host_htp_evaluation": "passed",
+    "board_execution": "not performed"
+  },
+  "repair": {
+    "initial_threshold_triggered": false,
+    "performed": true,
+    "final_equals_initial": false,
+    "selection": {
+      "initial": {
+        "map50": 0.6789615276936698,
+        "map50_95": 0.3230968179760054,
+        "detections": 49053,
+        "per_class": [
+          {
+            "category_id": 1,
+            "map50": 0.7873836086300815,
+            "map50_95": 0.2107039401147703
+          },
+          {
+            "category_id": 2,
+            "map50": 0.8462983072500798,
+            "map50_95": 0.56324816352603
+          },
+          {
+            "category_id": 3,
+            "map50": 0.6213090601071639,
+            "map50_95": 0.3370944078177467
+          },
+          {
+            "category_id": 4,
+            "map50": 0.4608551347873542,
+            "map50_95": 0.18134076044547473
+          }
+        ]
+      },
+      "candidates": {
+        "legacy_pcq": {
+          "map50": 0.8308131220109748,
+          "map50_95": 0.3697354918873114,
+          "detections": 924,
+          "per_class": [
+            {
+              "category_id": 1,
+              "map50": 0.9116899164946706,
+              "map50_95": 0.25419515759020356
+            },
+            {
+              "category_id": 2,
+              "map50": 0.9306930693069307,
+              "map50_95": 0.5632894827944334
+            },
+            {
+              "category_id": 3,
+              "map50": 0.831421114806535,
+              "map50_95": 0.4343393843863136
+            },
+            {
+              "category_id": 4,
+              "map50": 0.6494483874357632,
+              "map50_95": 0.22711794277829522
+            }
+          ]
+        }
+      },
+      "selected_dir": "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/w8a16_run_20261121/light/candidates/legacy_pcq",
+      "selected_variant": "legacy_pcq",
+      "selection_set": "8 fixed calibration images; no final-test selection",
+      "final_test_usage": "Initial test used for failure diagnosis; final result is same-set regression verification."
+    },
+    "diagnosis": "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/w8a16_run_20261121/light/diagnosis/intermediate_comparison.json",
+    "final_test_is_same_set_regression": true
+  }
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "id": 0,
+    "label": "red",
+    "color": "0xFF0000FF"
+  },
+  {
+    "id": 1,
+    "label": "yellow",
+    "color": "0xFFFF00FF"
+  },
+  {
+    "id": 2,
+    "label": "green",
+    "color": "0x00FF00FF"
+  },
+  {
+    "id": 3,
+    "label": "none",
+    "color": "0x808080FF"
+  }
+]

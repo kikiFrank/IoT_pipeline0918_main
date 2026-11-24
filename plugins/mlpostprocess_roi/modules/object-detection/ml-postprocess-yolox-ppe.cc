@@ -15,7 +15,17 @@
 
 namespace {
 constexpr uint32_t kPredictions = 8400;
-#if defined(AIBOX_YOLOX_COLOR8)
+#if defined(AIBOX_YOLOX_PPE_GESTURE1121)
+constexpr uint32_t kClasses = 4;
+constexpr uint32_t kHuman = 0;
+constexpr uint32_t kGesture = 3;
+constexpr const char* kModuleName = "YOLOX-PPE-GESTURE1121";
+
+bool IsPersonState(uint32_t id) { return id == kHuman || id == kGesture; }
+#elif defined(AIBOX_YOLOX_LIGHT1121)
+constexpr uint32_t kClasses = 4;
+constexpr const char* kModuleName = "YOLOX-LIGHT1121";
+#elif defined(AIBOX_YOLOX_COLOR8)
 constexpr uint32_t kClasses = 8;
 constexpr const char* kModuleName = "YOLOX-COLOR8";
 #elif defined(AIBOX_YOLOX_STACKLIGHT)
@@ -110,7 +120,14 @@ bool Module::Process(const Tensors& tensors, Dictionary& mlparams,
   }
   const Tensor& tensor = tensors.front();
   const uint32_t columns = 5 + kClasses;
-  if (tensor.name != "output" || tensor.dimensions != std::vector<uint32_t>{1, kPredictions, columns} ||
+  bool named_output = tensor.name == "output";
+#if defined(AIBOX_YOLOX_PPE_GESTURE1121) || defined(AIBOX_YOLOX_LIGHT1121)
+  // The installed qtimlqnn dequantizes the single output to FLOAT32 and
+  // can omit its name. Do not accept unnamed quantized tensors, which
+  // would also be missing the metadata needed to dequantize them correctly.
+  named_output |= tensor.name == "unknown" && tensor.type == TensorType::kFloat32;
+#endif
+  if (!named_output || tensor.dimensions != std::vector<uint32_t>{1, kPredictions, columns} ||
       (tensor.type != TensorType::kFloat32 && tensor.type != TensorType::kUint16) ||
       tensor.data == nullptr) {
     LOG(logger_, kError, "%s tensor contract mismatch: name=%s type=%u dims=%u",
@@ -181,8 +198,14 @@ bool Module::Process(const Tensors& tensors, Dictionary& mlparams,
   for (const auto& candidate : candidates) {
     bool suppressed = false;
     for (const auto& selected : kept) {
-      if (candidate.class_id == selected.class_id &&
-          IntersectionScore(candidate, selected) > nms_iou_) {
+      bool same_group = candidate.class_id == selected.class_id;
+#if defined(AIBOX_YOLOX_PPE_GESTURE1121)
+      // Human and gesture describe the same object type. Ranking already uses
+      // objectness * class probability, so the higher-confidence box wins.
+      same_group |= IsPersonState(candidate.class_id) &&
+                    IsPersonState(selected.class_id);
+#endif
+      if (same_group && IntersectionScore(candidate, selected) > nms_iou_) {
         suppressed = true;
         break;
       }

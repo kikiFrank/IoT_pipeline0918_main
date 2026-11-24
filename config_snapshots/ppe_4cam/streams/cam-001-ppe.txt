@@ -3,7 +3,7 @@ camera_id=cam-001
 name=PPE Camera 001
 enabled=1
 source_type=rtsp
-rtsp_url=rtsp://192.168.50.41:8554/cam0
+rtsp_url=rtsp://192.168.50.59:8554/cam0
 encoding=h264
 
 [decode]

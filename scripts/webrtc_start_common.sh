@@ -34,7 +34,7 @@ echo "PLUGINS=$PLUGINS"
 echo "SNAP=$SNAP"
 
 ulimit -n 65536 2>/dev/null || true
-. /tmp/aibox_wayland.env 2>/dev/null || true
+# Dedicated display environment is set by runtime_graphics_env.sh.
 # E2 fix: shared graphics env (Adreno ICD pin + profile-versioned registry).
 # shellcheck disable=SC1091
 . "$R/scripts/runtime_graphics_env.sh"
@@ -78,14 +78,10 @@ echo NATS_OK
 # scripts/aibox_graphics_gate.sh (shared with tmp A/B runs).
 # shellcheck disable=SC1091
 . "$R/scripts/aibox_graphics_gate.sh"
-# Board-local: reboot leaves no weston (stale wayland-0 possible). Auto-start
-# Adreno force-on so start2/3/6/9 work with zero extra commands. forceon may
-# exit 1 on this board's benign EINVAL log; the gate still admits a live
-# compositor when AIBOX_GFX_EINVAL_WARN=1.
-if ! pgrep -f 'weston --backend' >/dev/null 2>&1; then
-  echo "GFX_WESTON_MISSING: auto-start _start_adreno_weston_forceon.sh"
-  bash "$R/scripts/_start_adreno_weston_forceon.sh" \
-    || echo "GFX_WESTON_FORCEON_NONZERO (gate will decide)"
+# The dedicated service owns the compositor, independent of GDM.
+if ! systemctl is-active --quiet aibox-weston.service; then
+  echo "GFX_WESTON_START: aibox-weston.service"
+  sudo -n systemctl start aibox-weston.service || exit 7
 fi
 aibox_graphics_gate_for_start || exit 7
 

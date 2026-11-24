@@ -1,0 +1,15 @@
+[Unit]
+Description=AIBox headless Wayland compositor
+[Service]
+Type=notify
+User=ubuntu
+Group=ubuntu
+RuntimeDirectory=aibox-wayland
+RuntimeDirectoryMode=0700
+Environment=XDG_RUNTIME_DIR=/run/aibox-wayland
+ExecStart=/usr/bin/weston --backend=headless --renderer=pixman --shell=kiosk --socket=wayland-aibox --width=640 --height=480 --idle-time=0 --no-config --modules=systemd-notify.so
+Restart=on-failure
+RestartSec=2
+TimeoutStartSec=20
+[Install]
+WantedBy=multi-user.target

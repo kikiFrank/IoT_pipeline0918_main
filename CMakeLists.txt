@@ -202,10 +202,13 @@ if(BUILD_TESTING)
     add_executable(ppe_postprocess_test tests/ppe/test_yolox_ppe_postprocess.cpp)
     add_executable(stacklight_postprocess_test tests/ppe/test_yolox_ppe_postprocess.cpp)
     target_compile_definitions(stacklight_postprocess_test PRIVATE AIBOX_YOLOX_STACKLIGHT=1)
+    add_executable(ppe_gesture1121_postprocess_test tests/ppe/test_yolox_ppe_gesture1121.cpp)
+    target_compile_definitions(ppe_gesture1121_postprocess_test PRIVATE AIBOX_YOLOX_PPE_GESTURE1121=1)
     add_executable(gesture_postprocess_test
         tests/raisehands/test_gesture.cpp src/pipeline/GstElementHelper.cpp)
     foreach(test_target color8_postprocess_test ppe_postprocess_test
-                        stacklight_postprocess_test gesture_postprocess_test)
+                        stacklight_postprocess_test gesture_postprocess_test
+                        ppe_gesture1121_postprocess_test)
         target_include_directories(${test_target} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/plugins/mlpostprocess_roi/modules)
     endforeach()
@@ -222,6 +225,8 @@ if(BUILD_TESTING)
     add_test(NAME stacklight_postprocess_test COMMAND stacklight_postprocess_test
         ${TEST_LABEL_ROOT}/ppe_4cam/labels/ppe_labels.txt
         ${TEST_LABEL_ROOT}/andon_4cam/labels/stacklight.txt)
+    add_test(NAME ppe_gesture1121_postprocess_test COMMAND ppe_gesture1121_postprocess_test
+        ${TEST_LABEL_ROOT}/ppe_gesture1121/labels/classes.txt)
     add_test(NAME gesture_postprocess_test COMMAND gesture_postprocess_test
         ${TEST_LABEL_ROOT}/raisehands_4cam/labels/gesture_labels.txt)
 endif()

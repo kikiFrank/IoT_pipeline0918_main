@@ -18,6 +18,7 @@
 #include <array>
 #include <atomic>
 #include <cstdio>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -32,6 +33,75 @@
 #include <gst/app/gstappsink.h>
 
 namespace aibox::pipeline {
+
+namespace {
+bool UsesYolox1121(const StagePlan& stage) {
+  return stage.postprocess_module == "yolox-ppe-gesture1121" ||
+         stage.postprocess_module == "yolox-light1121";
+}
+
+constexpr int kYoloxSide = 640;
+constexpr int kYoloxChannels = 3;
+constexpr gsize kYoloxTensorBytes =
+    kYoloxSide * kYoloxSide * kYoloxChannels * sizeof(std::uint16_t);
+
+struct YoloxInputEncoding {
+  std::array<std::uint16_t, 256> codes{};
+  bool logged = false;
+};
+
+GstPadProbeReturn EncodeYolox1121Tensor(GstPad* pad, GstPadProbeInfo* info,
+                                      gpointer data) {
+  auto& encoding = *static_cast<YoloxInputEncoding*>(data);
+  GstBuffer* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+  if (!buffer || GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_GAP))
+    return GST_PAD_PROBE_OK;
+
+  GstElement* converter = gst_pad_get_parent_element(pad);
+  if (!converter) return GST_PAD_PROBE_DROP;
+  GstPad* sink = gst_element_get_static_pad(converter, "sink");
+  GstCaps* caps = sink ? gst_pad_get_current_caps(sink) : nullptr;
+  GstVideoInfo video_info;
+  const bool valid_video = caps && gst_video_info_from_caps(&video_info, caps);
+  if (caps) gst_caps_unref(caps);
+  if (sink) gst_object_unref(sink);
+
+  GstMapInfo map = GST_MAP_INFO_INIT;
+  if (!valid_video || video_info.width == 0 || video_info.height == 0 ||
+      gst_buffer_get_size(buffer) != kYoloxTensorBytes ||
+      !gst_buffer_is_writable(buffer) || !gst_buffer_is_all_memory_writable(buffer) ||
+      !gst_buffer_map(buffer, &map, GST_MAP_READWRITE)) {
+    GST_ELEMENT_ERROR(converter, STREAM, FORMAT,
+                      ("Cannot encode YOLOX 1121 input"),
+                      ("Expected video caps and a writable NHWC 640x640x3 U16 tensor"));
+    gst_object_unref(converter);
+    return GST_PAD_PROBE_DROP;
+  }
+  gst_object_unref(converter);
+
+  // Top-left resize uses the longer source edge to calculate the content size.
+  const int longest = std::max(video_info.width, video_info.height);
+  const int content_width = kYoloxSide * video_info.width / longest;
+  const int content_height = kYoloxSide * video_info.height / longest;
+  auto* values = reinterpret_cast<std::uint16_t*>(map.data);
+  for (int y = 0; y < kYoloxSide; ++y) {
+    auto* row = values + y * kYoloxSide * kYoloxChannels;
+    const int content_samples = y < content_height ? content_width * kYoloxChannels : 0;
+    // Observed converter U16 uses 0..65535; training uses byte-valued BGR.
+    for (int i = 0; i < content_samples; ++i)
+      row[i] = encoding.codes[(static_cast<unsigned>(row[i]) + 128U) / 257U];
+    std::fill(row + content_samples, row + kYoloxSide * kYoloxChannels,
+              encoding.codes[114]);
+  }
+  gst_buffer_unmap(buffer, &map);
+  if (!encoding.logged) {
+    fprintf(stderr, "[YOLOX1121_INPUT] BGR top-left %dx%d in 640x640 U16 pad=114 code=%u\n",
+            content_width, content_height, static_cast<unsigned>(encoding.codes[114]));
+    encoding.logged = true;
+  }
+  return GST_PAD_PROBE_OK;
+}
+}  // namespace
 
 // ===================================================================
 // RequestPadHandle — move-only RAII, strong owner ref
@@ -2016,7 +2086,7 @@ Result<GstPipelineBuildResult> GstPipelineBuilder::Build(
           if (stage.time_mux_group_id == tmux.time_mux_group_id &&
               (stage.postprocess_module == "yolox-ppe" ||
                stage.postprocess_module == "yolox-stacklight" ||
-               stage.postprocess_module == "yolox-color8")) {
+               stage.postprocess_module == "yolox-color8" || UsesYolox1121(stage))) {
             g_object_set_data(G_OBJECT(overlay), "aibox-ppe-filter-empty-roi",
                               GINT_TO_POINTER(1));
             break;
@@ -2528,7 +2598,32 @@ Status GstPipelineBuilder::ConfigQtimlVConverter(GstElement* conv,
   Status arr_status = set_gdouble_array_prop("mean", stage.converter_mean);
   if (!arr_status.ok)
     return arr_status;
-  return set_gdouble_array_prop("sigma", stage.converter_sigma);
+  arr_status = set_gdouble_array_prop("sigma", stage.converter_sigma);
+  if (!arr_status.ok || !UsesYolox1121(stage)) return arr_status;
+
+  const auto& input = stage.model_input;
+  if (roi_input || input.name != "images" || input.layout != "NHWC" ||
+      input.width != kYoloxSide || input.height != kYoloxSide ||
+      input.channels != kYoloxChannels || input.dtype != TensorDataType::kUInt16 ||
+      stage.converter_output_tensor_type != TensorDataType::kUInt16 ||
+      stage.image_disposition != "top-left" || stage.subpixel_layout != "reverse" ||
+      stage.converter_engine != "gles" || !stage.converter_mean.empty() ||
+      !stage.converter_sigma.empty() || !std::isfinite(input.quant_scale) ||
+      input.quant_scale <= 0.0 || input.quant_offset != 0) {
+    return Status::Error("YOLOX1121_INPUT_CONFIG",
+        "requires full-frame top-left BGR U16 GLES and positive input scale with zero offset");
+  }
+  GstPad* src = gst_element_get_static_pad(conv, "src");
+  if (!src) return Status::Error("YOLOX1121_INPUT_PAD", "missing converter src pad");
+  auto encoding = std::make_unique<YoloxInputEncoding>();
+  for (size_t pixel = 0; pixel < encoding->codes.size(); ++pixel) {
+    const double code = std::round(static_cast<double>(pixel) / input.quant_scale);
+    encoding->codes[pixel] = static_cast<std::uint16_t>(std::clamp(code, 0.0, 65535.0));
+  }
+  gst_pad_add_probe(src, GST_PAD_PROBE_TYPE_BUFFER, EncodeYolox1121Tensor,
+      encoding.release(), [](gpointer context) { delete static_cast<YoloxInputEncoding*>(context); });
+  gst_object_unref(src);
+  return Status::Ok();
 }
 
 // ===================================================================
@@ -2733,7 +2828,7 @@ Status GstPipelineBuilder::ConfigQtimlPostProcess(GstElement* post,
   if (conf <= 1.0) conf *= 100.0;  // 0-1 小数 -> 百分制
   char settings[128];
   if (stage.postprocess_module == "yolox-ppe" ||
-      stage.postprocess_module == "yolox-color8") {
+      stage.postprocess_module == "yolox-color8" || UsesYolox1121(stage)) {
     const float nms = stage.model_postprocess.nms_iou_thresh;
     if (!std::isfinite(nms) || nms <= 0.0f || nms > 1.0f)
       return Status::Error("PPE_NMS_RANGE", "nms_iou_thresh must be in (0,1]");

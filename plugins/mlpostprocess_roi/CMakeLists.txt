@@ -79,50 +79,16 @@ if(USE_QTI_PKGCONFIG)
     ${GST_QCOM_ALLOC_LIBRARIES}
   )
 else()
-  # Fallback: look for build directory (板卡常见路径)
-  if(NOT DEFINED QTI_BUILD_DIR)
-    if(EXISTS "/mnt/workspace/gst-plugins-qti-oss-imsdk.lnx.2.0.0.r2-rel/build_tmp_multi_cam_fix/gst-plugin-base/gst/ml")
-      set(QTI_BUILD_DIR "/mnt/workspace/gst-plugins-qti-oss-imsdk.lnx.2.0.0.r2-rel/build_tmp_multi_cam_fix/gst-plugin-base")
-    elseif(EXISTS "/mnt/workspace/gst-plugins-qti-oss-imsdk.lnx.2.0.0.r2-rel/build_stage1b2_core/gst-plugin-base/gst/ml")
-      set(QTI_BUILD_DIR "/mnt/workspace/gst-plugins-qti-oss-imsdk.lnx.2.0.0.r2-rel/build_stage1b2_core/gst-plugin-base")
-    elseif(EXISTS "/mnt/workspace/build-plugins/gst-plugin-base/gst/ml")
-      set(QTI_BUILD_DIR "/mnt/workspace/build-plugins/gst-plugin-base")
-    endif()
-  endif()
-
-  if(NOT DEFINED QTI_BUILD_DIR)
-    message(FATAL_ERROR
-      "QTI pkg-config packages not found and QTI_BUILD_DIR is unset. "
-      "Please set -DQTI_BUILD_DIR=<path-to-gst-plugin-base-build>.")
-  endif()
-
+  # Ubuntu QIM packages provide the runtime libraries. Reuse the matching
+  # headers from the source tree without requiring an SDK build tree.
   if(NOT EXISTS "${QTI_SOURCE_ROOT}/gst/ml/ml-info.h")
     message(FATAL_ERROR
       "Cannot find QTI source headers at ${QTI_SOURCE_ROOT}. "
-      "Set QTI_SOURCE_ROOT or fix source tree layout.")
+      "Set QTI_SOURCE_ROOT to gst-plugin-base.")
   endif()
 
-  if(NOT EXISTS "${QTI_BUILD_DIR}/gst/ml"
-     OR NOT EXISTS "${QTI_BUILD_DIR}/gst/utils"
-     OR NOT EXISTS "${QTI_BUILD_DIR}/gst/video"
-     OR NOT EXISTS "${QTI_BUILD_DIR}/gst/allocators"
-     OR NOT EXISTS "${QTI_BUILD_DIR}/gst/memory")
-    message(FATAL_ERROR
-      "QTI_BUILD_DIR does not look like a gst-plugin-base build tree: ${QTI_BUILD_DIR}")
-  endif()
-
-  message(STATUS "QTI pkg-config packages not found, using fallback mode")
-  message(STATUS "Using QTI source headers from: ${QTI_SOURCE_ROOT}")
-  message(STATUS "Using QTI build libs from: ${QTI_BUILD_DIR}")
-
+  message(STATUS "Using QTI source headers and installed runtime: ${QTI_SOURCE_ROOT}")
   set(QTI_INCLUDE_DIRS ${QTI_SOURCE_ROOT})
-  set(QTI_LINK_DIRS
-    ${QTI_BUILD_DIR}/gst/ml
-    ${QTI_BUILD_DIR}/gst/utils
-    ${QTI_BUILD_DIR}/gst/video
-    ${QTI_BUILD_DIR}/gst/allocators
-    ${QTI_BUILD_DIR}/gst/memory
-  )
   set(QTI_LINK_LIBRARIES
     /usr/lib/aarch64-linux-gnu/libgstqtimlbase.so.1
     /usr/lib/aarch64-linux-gnu/libgstqtivideobase.so.1
@@ -130,6 +96,11 @@ else()
     /usr/lib/aarch64-linux-gnu/libgstqtiutilsbase.so.1
     /usr/lib/aarch64-linux-gnu/libgstqtiallocatorsbase.so.1
   )
+  foreach(qti_library IN LISTS QTI_LINK_LIBRARIES)
+    if(NOT EXISTS "${qti_library}")
+      message(FATAL_ERROR "Missing installed QTI library: ${qti_library}")
+    endif()
+  endforeach()
 endif()
 
 # Generate configuration header file
@@ -266,6 +237,16 @@ install(TARGETS ${YOLOX_COLOR8_MODULE}
   PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
               GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ
 )
+
+# Fine-tuned Nov 21 models have distinct labels and suppression policies.
+function(add_yolox1121_module name definition)
+  add_library(${name} SHARED modules/object-detection/ml-postprocess-yolox-ppe.cc)
+  target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/modules)
+  target_compile_definitions(${name} PRIVATE ${definition}=1)
+  install(TARGETS ${name} LIBRARY DESTINATION ${GST_ML_MODULES_DIR_LOCAL})
+endfunction()
+add_yolox1121_module(ml-postprocess-yolox-ppe-gesture1121 AIBOX_YOLOX_PPE_GESTURE1121)
+add_yolox1121_module(ml-postprocess-yolox-light1121 AIBOX_YOLOX_LIGHT1121)
 
 add_library(${YOLO26_MODULE} SHARED
   modules/object-detection/ml-postprocess-yolo26.cc

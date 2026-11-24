@@ -1,0 +1,446 @@
+{
+  "source": {
+    "source": "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/ppe_increment/model/yolox_s_ppe_1123.onnx",
+    "sha256": "10f99164d8e5dbf9d20af691ec019c0c7eb5f519477df03165d95301af3b6bee",
+    "copied_sha256": "10f99164d8e5dbf9d20af691ec019c0c7eb5f519477df03165d95301af3b6bee",
+    "categories": [
+      {
+        "id": 1,
+        "name": "human",
+        "supercategory": "ppe"
+      },
+      {
+        "id": 2,
+        "name": "white_hat",
+        "supercategory": "ppe"
+      },
+      {
+        "id": 3,
+        "name": "white_cloth",
+        "supercategory": "ppe"
+      },
+      {
+        "id": 4,
+        "name": "gesture",
+        "supercategory": "ppe"
+      }
+    ],
+    "calibration_images": 200,
+    "test_images": 10,
+    "gt_boxes": 127,
+    "contract": "Continuing user-authorized PPE pipeline: BGR 0..255 float32, top-left 640 letterbox pad114; decoded cxcywh,obj,4sigmoid classes; score .001 class-aware NMS .65.",
+    "labels_evidence": "/mnt/g/Visteon/Nov_26/daily_record/11-20/yolo_x_finetune1120/datasets/ppe/annotations",
+    "evaluation_scope": "User test folder, original val split; same-scene regression, no independent-scene claim.",
+    "selection_policy": "8 fixed calibration images; primary mAP50, secondary mAP50_95, tie retains initial; first recipe legacy PCQ based on previous observed qv2 failure."
+  },
+  "target": {
+    "chip": "QCS9075",
+    "dsp_arch": "v73",
+    "soc_id": 77
+  },
+  "sdk": "v2.46.0.260424121129",
+  "environment_script": "E:/W_space/Ubuntu_22_04/setup_py_qairt_env2.46.sh",
+  "environment_script_sha256": "ff67f9b6ce4590b7865b3d018f69ebc45cf69501adb3b30d250bd1838a5bf81e",
+  "assets": {
+    "bin": {
+      "file": "yolox_s_ppe_1123_w8a16.bin",
+      "bytes": 9666560,
+      "sha256": "af100f47dfb8040c9dc7b0bda74e7385ecf8fcbfb4a018929736491f7e952349"
+    },
+    "dlc": {
+      "file": "yolox_s_ppe_1123_w8a16.dlc",
+      "bytes": 9967196,
+      "sha256": "bc105770cb84da91b74fc0906ff2411296b7697d8fc26289549958c4c9b5485f"
+    }
+  },
+  "stages": {
+    "onnx": {
+      "task": "ppe",
+      "stage": "onnx",
+      "expected": 10,
+      "successful": 10,
+      "metrics": {
+        "map50": 0.9021804416928805,
+        "map50_95": 0.6403328096054406,
+        "detections": 261,
+        "per_class": [
+          {
+            "category_id": 1,
+            "map50": 0.9283356907119283,
+            "map50_95": 0.7457459717937549,
+            "name": "human",
+            "gt_boxes": 43
+          },
+          {
+            "category_id": 2,
+            "map50": 0.8638805160811983,
+            "map50_95": 0.5317757834296751,
+            "name": "white_hat",
+            "gt_boxes": 45
+          },
+          {
+            "category_id": 3,
+            "map50": 0.9143251182855144,
+            "map50_95": 0.6434766735928917,
+            "name": "white_cloth",
+            "gt_boxes": 39
+          },
+          {
+            "category_id": 4,
+            "map50": null,
+            "map50_95": null,
+            "name": "gesture",
+            "gt_boxes": 0
+          }
+        ]
+      }
+    },
+    "float_dlc": {
+      "task": "ppe",
+      "stage": "float_dlc",
+      "expected": 10,
+      "successful": 10,
+      "metrics": {
+        "map50": 0.9021804416928805,
+        "map50_95": 0.6403328096054406,
+        "detections": 261,
+        "per_class": [
+          {
+            "category_id": 1,
+            "map50": 0.9283356907119283,
+            "map50_95": 0.7457459717937549,
+            "name": "human",
+            "gt_boxes": 43
+          },
+          {
+            "category_id": 2,
+            "map50": 0.8638805160811983,
+            "map50_95": 0.5317757834296751,
+            "name": "white_hat",
+            "gt_boxes": 45
+          },
+          {
+            "category_id": 3,
+            "map50": 0.9143251182855144,
+            "map50_95": 0.6434766735928917,
+            "name": "white_cloth",
+            "gt_boxes": 39
+          },
+          {
+            "category_id": 4,
+            "map50": null,
+            "map50_95": null,
+            "name": "gesture",
+            "gt_boxes": 0
+          }
+        ]
+      },
+      "drop_map50_pp": 0.0,
+      "drop_map50_95_pp": 0.0,
+      "repair_required": false
+    },
+    "w8a16_bin": {
+      "task": "ppe",
+      "stage": "w8a16_bin",
+      "expected": 10,
+      "successful": 10,
+      "metrics": {
+        "map50": 0.8794648264654089,
+        "map50_95": 0.6223559799968994,
+        "detections": 150,
+        "per_class": [
+          {
+            "category_id": 1,
+            "map50": 0.9283356907119283,
+            "map50_95": 0.7418738653696246,
+            "name": "human",
+            "gt_boxes": 43
+          },
+          {
+            "category_id": 2,
+            "map50": 0.7991452991452991,
+            "map50_95": 0.49790989023397475,
+            "name": "white_hat",
+            "gt_boxes": 45
+          },
+          {
+            "category_id": 3,
+            "map50": 0.9109134895389992,
+            "map50_95": 0.6272841843870987,
+            "name": "white_cloth",
+            "gt_boxes": 39
+          },
+          {
+            "category_id": 4,
+            "map50": null,
+            "map50_95": null,
+            "name": "gesture",
+            "gt_boxes": 0
+          }
+        ]
+      },
+      "drop_map50_pp": 2.2715615227471564,
+      "drop_map50_95_pp": 1.797682960854119,
+      "repair_required": false
+    },
+    "final_w8a16_bin": {
+      "task": "ppe",
+      "stage": "final_w8a16_bin",
+      "expected": 10,
+      "successful": 10,
+      "metrics": {
+        "map50": 0.8862755942691877,
+        "map50_95": 0.6276843784265668,
+        "detections": 185,
+        "per_class": [
+          {
+            "category_id": 1,
+            "map50": 0.9283356907119283,
+            "map50_95": 0.7372142540426699,
+            "name": "human",
+            "gt_boxes": 43
+          },
+          {
+            "category_id": 2,
+            "map50": 0.818069306930693,
+            "map50_95": 0.5033332657226076,
+            "name": "white_hat",
+            "gt_boxes": 45
+          },
+          {
+            "category_id": 3,
+            "map50": 0.9124217851649419,
+            "map50_95": 0.6425056155144229,
+            "name": "white_cloth",
+            "gt_boxes": 39
+          },
+          {
+            "category_id": 4,
+            "map50": null,
+            "map50_95": null,
+            "name": "gesture",
+            "gt_boxes": 0
+          }
+        ]
+      },
+      "drop_map50_pp": 1.5904847423692803,
+      "drop_map50_95_pp": 1.264843117887382,
+      "repair_required": false
+    }
+  },
+  "selection": {
+    "initial": {
+      "map50": 0.5643188801821196,
+      "map50_95": 0.2805773736317535,
+      "detections": 202,
+      "per_class": [
+        {
+          "category_id": 1,
+          "map50": 0.5836891839259467,
+          "map50_95": 0.3787949203937958
+        },
+        {
+          "category_id": 2,
+          "map50": 0.5412733262350977,
+          "map50_95": 0.21383272206055506
+        },
+        {
+          "category_id": 3,
+          "map50": 0.5778575650228797,
+          "map50_95": 0.30591947583503937
+        },
+        {
+          "category_id": 4,
+          "map50": 0.5544554455445545,
+          "map50_95": 0.22376237623762377
+        }
+      ]
+    },
+    "candidates": {
+      "legacy_pcq_bounded": {
+        "map50": 0.5954259490248549,
+        "map50_95": 0.30101823775431197,
+        "detections": 304,
+        "per_class": [
+          {
+            "category_id": 1,
+            "map50": 0.6432617957503151,
+            "map50_95": 0.42528732476952774
+          },
+          {
+            "category_id": 2,
+            "map50": 0.5608789947317714,
+            "map50_95": 0.222205465613451
+          },
+          {
+            "category_id": 3,
+            "map50": 0.6231075600727789,
+            "map50_95": 0.33281778439664556
+          },
+          {
+            "category_id": 4,
+            "map50": 0.5544554455445545,
+            "map50_95": 0.22376237623762377
+          }
+        ]
+      }
+    },
+    "selected_dir": "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/ppe_increment/w8a16_run_20261123/ppe/candidates/legacy_pcq_bounded",
+    "selected_variant": "legacy_pcq_bounded",
+    "selection_set": "8 fixed calibration images; no final-test selection",
+    "final_test_usage": "Initial and selected final model measured on the same supplied test images; selection used calibration only. No test-based recipe ranking."
+  },
+  "recipe": {
+    "argv": [
+      "qairt-quantizer",
+      "--input_dlc",
+      "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/ppe_increment/w8a16_run_20261123/ppe/candidates/legacy_pcq_bounded/model_float_overrides.dlc",
+      "--input_list",
+      "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/ppe_increment/w8a16_run_20261123/ppe/calibration_input_list.txt",
+      "--output_dlc",
+      "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/ppe_increment/w8a16_run_20261123/ppe/candidates/legacy_pcq_bounded/model_w8a16.dlc",
+      "--target_backend",
+      "HTP",
+      "--weights_bitwidth",
+      "8",
+      "--act_bitwidth",
+      "16",
+      "--bias_bitwidth",
+      "32",
+      "--use_per_channel_quantization"
+    ],
+    "variant": "legacy_pcq_bounded",
+    "change_from_initial": "See bound_evidence or adjust_bias_encoding; compared to legacy_pcq",
+    "bound_evidence": {
+      "source": "all calibration images only",
+      "distribution": "/mnt/g/Visteon/Nov_26/daily_record/11-21/量化两个新的yolox/ppe_increment/w8a16_run_20261123/ppe/calibration_output_distribution.json",
+      "encoding": {
+        "bitwidth": 16,
+        "dtype": "int",
+        "is_symmetric": "False",
+        "min": -64.0,
+        "max": 1024.0,
+        "scale": 0.016601815823605707,
+        "offset": -3855
+      },
+      "change": "Only final shared output encoding range relative to legacy_pcq; same graph, IO shape/type and postprocessing."
+    },
+    "activation_calibration": "min-max",
+    "weight_granularity": "per-channel",
+    "selection_data": "8 fixed calibration images",
+    "actual_output_encoding": {
+      "scale": 0.016601815819740295,
+      "offset": -3855
+    }
+  },
+  "audit": {
+    "passed": true,
+    "learned_layers": 83,
+    "weights": {
+      "sFxp_8": 83
+    },
+    "biases": {
+      "sFxp_32": 83
+    },
+    "learned_activations": {
+      "uFxp_16": 83
+    },
+    "all_op_outputs": {
+      "uFxp_16": 284
+    },
+    "io": {
+      "images": {
+        "dtype": "uFxp_16",
+        "shape": [
+          1,
+          640,
+          640,
+          3
+        ],
+        "direction": "APP_WRITE"
+      },
+      "output": {
+        "dtype": "uFxp_16",
+        "shape": [
+          1,
+          8400,
+          9
+        ],
+        "direction": "APP_READ"
+      }
+    },
+    "violations": []
+  },
+  "graph_name": "model_float_overrides",
+  "inputs": [
+    {
+      "version": "QNN_TENSOR_VERSION_2",
+      "id": 1,
+      "name": "images",
+      "type": "QNN_TENSOR_TYPE_APP_WRITE",
+      "dataFormat": "QNN_TENSOR_DATA_FORMAT_FLAT_BUFFER",
+      "dataType": "QNN_DATATYPE_UFIXED_POINT_16",
+      "rank": 4,
+      "dimensions": [
+        1,
+        640,
+        640,
+        3
+      ],
+      "memType": "QNN_TENSORMEMTYPE_RAW",
+      "quantizeParams": {
+        "definition": "QNN_DEFINITION_DEFINED",
+        "quantizationEncoding": "QNN_QUANTIZATION_ENCODING_SCALE_OFFSET",
+        "scaleOffset": {
+          "scale": 0.0038910505827516317,
+          "offset": 0
+        }
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "version": "QNN_TENSOR_VERSION_2",
+      "id": 721,
+      "name": "output",
+      "type": "QNN_TENSOR_TYPE_APP_READ",
+      "dataFormat": "QNN_TENSOR_DATA_FORMAT_FLAT_BUFFER",
+      "dataType": "QNN_DATATYPE_UFIXED_POINT_16",
+      "rank": 3,
+      "dimensions": [
+        1,
+        8400,
+        9
+      ],
+      "memType": "QNN_TENSORMEMTYPE_RAW",
+      "quantizeParams": {
+        "definition": "QNN_DEFINITION_DEFINED",
+        "quantizationEncoding": "QNN_QUANTIZATION_ENCODING_SCALE_OFFSET",
+        "scaleOffset": {
+          "scale": 0.016601815819740295,
+          "offset": -3855
+        }
+      }
+    }
+  ],
+  "classes_zero_based": [
+    "human",
+    "white_hat",
+    "white_cloth",
+    "gesture"
+  ],
+  "dequantization": "real=(q+offset)*scale",
+  "raw_evaluation_mode": "QNN default FLOAT32 input/output files with automatic quantization/dequantization; model native IO is U16.",
+  "validation": {
+    "compile": "passed",
+    "initial_single_image_smoke": "passed",
+    "final_calibration_selection_8_images": "passed",
+    "final_test_10_images": "passed",
+    "physical_board": "not performed"
+  },
+  "limitations": [
+    "10 supplied evaluation images are original val frames; same-video calibration/evaluation samples may be correlated.",
+    "No gesture GT in supplied test subset; gesture accuracy unverified.",
+    "No added CrowdHuman held-out subset evaluated in this quantization run."
+  ]
+}

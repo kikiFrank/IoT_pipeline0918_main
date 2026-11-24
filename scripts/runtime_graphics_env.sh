@@ -75,4 +75,7 @@ echo "EGL_VENDOR_PIN=${__EGL_VENDOR_LIBRARY_FILENAMES:-<unset>}"
 ldconfig -p 2>/dev/null | grep -E 'libEGL(_mesa)?\.so|libGLESv2(_adreno|_mesa)?\.so|libgbm\.so' || true
 echo "GST_REGISTRY=$GST_REGISTRY"
 
+# Pipeline-only display environment.
+export XDG_RUNTIME_DIR=/run/aibox-wayland
+export WAYLAND_DISPLAY=wayland-aibox
 AIBOX_GRAPHICS_ENV_LOADED=1
