@@ -1,0 +1,2 @@
+data/models/siglip2/text_encoder.bin filter=lfs diff=lfs merge=lfs -text
+data/models/siglip2/image_encoder.bin filter=lfs diff=lfs merge=lfs -text
