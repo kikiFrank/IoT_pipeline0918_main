@@ -1,7 +1,6 @@
 # 自定义插件与共享 ABI 目录
 
-> 代码核对基线：`b878219`；核对日期：2026-11-08。本文由外部架构草稿逐项对照本地源码后整理。
-> `verified` = 当前源码/配置直接支持；`inferred` = 结构推断；`board-verified` = 当前版本有板端证据；`needs-confirmation` = 证据不足。本次只读代码，未新增 board-verified 结论。
+> 源码核对日期 2026-11-25。基准为主工作区当前源码及配置。既有板端证据见 [验收索引](../validation/README.md)。
 
 ## 1. 清单与 factory/pads（verified）
 
@@ -35,6 +34,8 @@
 | group-caps | GstCaps boxed；init 为 null，canonical_raw 使用共享 raw caps |
 
 属性在 class_init 中以 READWRITE 声明；这本身不证明任意 PLAYING 时动态变更都安全。READY→PAUSED 创建 scheduler GThread；PAUSED→READY 置 running=false、广播 cond、join，并清空 latest buffers。chain 覆盖旧 buffer；request/release、EOS/FLUSH 与 caps 路径共同管理 sink context。slot 分配是环形空闲槽搜索，header 的“Monotonic”注释与实现不一致。
+
+统一 RTSP 的 `canonical_raw` 可变帧率输出与同组准入条件见 [当前拓扑](pipeline_topology.md)。PPE 1123 与 Light 1121 使用 `qtimlpostprocess_roi` 下的 `yolox-ppe-gesture1121` 和 `yolox-light1121` 模块，两目标由该插件工程构建。PPE 的 human/gesture 在后处理共用抑制组，白帽和工服与人员跨类别的归属由 Rust 规则在整帧处理。[模块构建](../../plugins/mlpostprocess_roi/CMakeLists.txt) · [PPE 后处理](../../plugins/mlpostprocess_roi/modules/object-detection/ml-postprocess-yolox-ppe.cc) · [PPE 匹配](../../../IoT_edge/aibox/crates/aibox-rule_engine/src/rule/ppe_compliance/association.rs)
 
 ## 3. aiboxstreamdemux（verified）
 

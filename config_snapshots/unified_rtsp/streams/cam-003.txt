@@ -1,0 +1,10 @@
+[stream]
+camera_id=cam-003
+name=cam-003
+enabled=1
+source_type=rtsp
+rtsp_url=rtsp://192.168.50.140:8556/cam-035
+encoding=h264
+
+[inference]
+algorithm=light1121

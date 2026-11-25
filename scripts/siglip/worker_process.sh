@@ -2,9 +2,19 @@
 SIGLIP_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SIGLIP_ROOT="${AIBOX_ROOT:-$(cd "$SIGLIP_SCRIPT_DIR/../.." && pwd)}"
 SIGLIP_ROOT="$(cd "$SIGLIP_ROOT" && pwd)"
-SIGLIP_EXE="$(readlink -f "$SIGLIP_ROOT/build_unified/aibox_siglip_worker")"
-SIGLIP_CONFIG="$(readlink -f "${SIGLIP_WORKER_CONFIG:-$SIGLIP_ROOT/config_snapshots/siglip_worker/worker.txt}")"
-SIGLIP_OUT="$SIGLIP_ROOT/output/siglip_worker"
+if [[ "${SIGLIP_PROCESS_KIND:-worker}" == scene ]]; then
+  SIGLIP_EXE="$(readlink -f "${SIGLIP_SCENE_EXE:-$SIGLIP_ROOT/build_unified/aibox_siglip_scene}")"
+  SIGLIP_CONFIG="$(readlink -f "${SIGLIP_SCENE_CONFIG:-$SIGLIP_ROOT/config_snapshots/siglip_scene/scene.json}")"
+  SIGLIP_OUT="$SIGLIP_ROOT/output/siglip_scene"
+  scene_name="$(basename "$SIGLIP_CONFIG" .json)"
+  if [[ "$scene_name" != scene ]]; then
+    SIGLIP_OUT="$SIGLIP_OUT/$scene_name"
+  fi
+else
+  SIGLIP_EXE="$(readlink -f "$SIGLIP_ROOT/build_unified/aibox_siglip_worker")"
+  SIGLIP_CONFIG="$(readlink -f "${SIGLIP_WORKER_CONFIG:-$SIGLIP_ROOT/config_snapshots/siglip_worker/worker.txt}")"
+  SIGLIP_OUT="$SIGLIP_ROOT/output/siglip_worker"
+fi
 SIGLIP_PIDFILE="$SIGLIP_OUT/worker.pid"
 mkdir -p "$SIGLIP_OUT"
 

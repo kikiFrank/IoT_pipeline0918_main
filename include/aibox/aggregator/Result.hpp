@@ -34,6 +34,8 @@ struct AggregatedResult {
   uint32_t    frame_width = 0;
   uint32_t    frame_height = 0;
   std::string algorithm_group_id;
+  std::string source_profile_code;
+  bool snapshot_cached = false;
   std::string time_mux_group_id;
   uint32_t    mux_slot_id = 0;
   std::vector<Detection> detections;   // fused across all stages

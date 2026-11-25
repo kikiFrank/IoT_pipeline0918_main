@@ -37,6 +37,8 @@ enum CoordinateSpace {
 }
 
 message FrameEvent {
+  string source_profile_code = 11;
+  optional bool snapshot_cached = 12;
   string  camera_id    = 1;
   int64   timestamp_ms = 2;  // Unix millis
   repeated Detection detections = 3;

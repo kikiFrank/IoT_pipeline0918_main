@@ -144,12 +144,12 @@ GstFlowReturn OnTerminalSamplePrint(GstAppSink* sink, gpointer user_data) {
 // Parse the fused terminal buffer into an AggregatedResult and Submit().
 // ===================================================================
 GstFlowReturn OnTerminalSampleToAggregator(GstAppSink* sink, gpointer user_data) {
-  auto* agg = static_cast<aibox::aggregator::ResultAggregator*>(user_data);
+  auto* context = static_cast<TerminalContext*>(user_data);
 
   GstSample* sample = gst_app_sink_pull_sample(sink);
   if (!sample) return GST_FLOW_OK;
   GstBuffer* buf = gst_sample_get_buffer(sample);
-  if (!buf || !agg) { gst_sample_unref(sample); return GST_FLOW_OK; }
+  if (!buf || !context) { gst_sample_unref(sample); return GST_FLOW_OK; }
 
   FrameMetaView fm = read_frame_meta_full(buf);
 
@@ -160,6 +160,8 @@ GstFlowReturn OnTerminalSampleToAggregator(GstAppSink* sink, gpointer user_data)
   res.algorithm_group_id = fm.algorithm_group_id ? fm.algorithm_group_id : "";
   res.time_mux_group_id  = fm.time_mux_group_id ? fm.time_mux_group_id : "";
   res.mux_slot_id        = fm.mux_slot_id;
+  const auto profile = context->profiles.find({res.camera_id, res.algorithm_group_id});
+  if (profile != context->profiles.end()) res.source_profile_code = profile->second;
   res.assembled_at_ms    = (uint64_t)(g_get_monotonic_time() / 1000);
 
   if (auto* tracker = aibox::detection::CaptureTimestampTracker::GetProcessInstance()) {
@@ -269,7 +271,7 @@ GstFlowReturn OnTerminalSampleToAggregator(GstAppSink* sink, gpointer user_data)
         cached.camera_id = res.camera_id;
         cached.frame_id = frame_id;
         cached.timestamp_ms = static_cast<int64_t>(res.capture_timestamp_ms);
-        cache->Put(std::move(cached));
+        res.snapshot_cached = cache->Put(std::move(cached));
       }
     }
   }
@@ -282,7 +284,7 @@ GstFlowReturn OnTerminalSampleToAggregator(GstAppSink* sink, gpointer user_data)
                              res.detections, now_mono_ms, sample);
   }
 
-  agg->Submit(std::move(res));
+  context->aggregator.Submit(std::move(res));
 
   gst_sample_unref(sample);
   return GST_FLOW_OK;

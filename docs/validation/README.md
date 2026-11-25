@@ -1,6 +1,20 @@
 # 正式验证与板端验收索引
 
-本目录记录明确版本与环境的正式测试矩阵和验收摘要。当前未新增正式板端记录；[工程知识库](../engineering-notes/README.md) 中旧结果仍是历史资料，不自动升级为当前版本 board-verified。
+本目录记录明确版本与环境的测试矩阵和验收摘要。[工程知识库](../engineering-notes/README.md) 保留不同版本的历史结果。
+
+## 2026-11-25 · 165 板端统一 RTSP 与 PPE 上报
+
+验收从 `/mnt/workspace/1125test_simplify/ai-box_stream_pipeline` 运行 `bash scripts/start_rtsp.sh`。启动日志给出的 run 为 `output/unified_rtsp/run-a59wc6ar`。此次使用板端最简 TXT 快照入口，在全部就绪后观察超过 120 秒。运行和停止证据属于当次板端版本。
+
+| 范围 | 当次证据 |
+|---|---|
+| 推理链进展 | 8 路 CNN 产生逐帧事件，4 路 SigLIP2 产生分数。观测结束时 supervisor 状态为 `ready` |
+| PPE 业务事件 | 四路共 49 条规则事件，逐条对应 `alarm.event`、SQLite 告警行和 MQTT 客户端日志 |
+| 推理帧关联 | 另一个采样窗口有 23 条 PPE 事件，人员检测 ID、类别和框均匹配对应源帧 |
+| 本地图片、远端图片 | 40 条关联为 `ready`，9 条为 `ready_near`。当次图片上传状态尚为 `pending`，MQTT 客户端日志记录与远端图片回执分别核验 |
+| 停止 | 执行 `bash scripts/stop_rtsp.sh` 后，本次 supervisor 和五个工作进程退出，检查时已无到 RTSP 源服务器的连接 |
+
+规则验收未计算逐人识别精度。本次文档核对使用已有日志摘要。各条告警和上传证据口径见 [微服务端到端盘点](../../../IoT_edge/aibox/arch_docs/Detection_to_MediaUpload_E2E_Completeness.md)。
 
 ## 任务资料与正式摘要
 

@@ -137,6 +137,31 @@ target_include_directories(aibox_siglip_worker PRIVATE
 target_link_libraries(aibox_siglip_worker PRIVATE
     aibox_siglip_core ${GST_LIBRARIES} ${GST_APP_LIBRARIES}
     ${NATS_LIBRARIES} Threads::Threads)
+add_executable(aibox_siglip_scene
+    src/siglip_worker/SceneMain.cpp
+    src/siglip_worker/SiglipPipelineBuilder.cpp
+    src/pipeline/GstElementHelper.cpp
+    src/adapter/NatsAdapter.cpp
+    src/detection/Uuid.cpp
+    src/media/SnapshotEncoder.cpp
+    src/media/ThumbnailEncoder.cpp
+    src/media/MediaFileWriter.cpp
+    src/media/NatsMediaReadyTransport.cpp
+    src/media/SnapshotTriggerPolicy.cpp
+    src/media/AnomalySnapshotService.cpp
+    src/media/SnapshotRequestSubscriber.cpp)
+target_include_directories(aibox_siglip_scene PRIVATE
+    ${GST_INCLUDE_DIRS} ${GST_APP_INCLUDE_DIRS} ${GST_VIDEO_INCLUDE_DIRS}
+    ${NATS_INCLUDE_DIRS} ${UUID_INCLUDE_DIRS})
+target_link_libraries(aibox_siglip_scene PRIVATE
+    aibox_siglip_core aibox_frame_cache ${GST_LIBRARIES} ${GST_APP_LIBRARIES}
+    ${GST_VIDEO_LIBRARIES} ${NATS_LIBRARIES} ${UUID_LIBRARIES} Threads::Threads)
+if(QTI_SOURCE_ROOT)
+    target_include_directories(aibox_siglip_scene PRIVATE ${QTI_SOURCE_ROOT})
+    target_compile_definitions(aibox_siglip_scene PRIVATE AIBOX_SIGLIP_QTI_METADATA=1)
+    target_link_libraries(aibox_siglip_scene PRIVATE
+        /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}/libgstqtimlbase.so.1)
+endif()
 if(BUILD_TESTING)
     target_compile_definitions(aibox_siglip_worker PRIVATE SIGLIP_TEST_HOOKS=1)
     add_executable(siglip_preprocess_probe tests/siglip_worker/preprocess_probe.cpp)

@@ -1,0 +1,17 @@
+{
+  "camera_id": "cam-011",
+  "rtsp_url": "rtsp://192.168.50.140:8556/cam-048",
+  "nats_url": "nats://127.0.0.1:4222",
+  "media_dir": "/var/lib/aibox/media/siglip2",
+  "prompt_version": "experiment-07",
+  "image_encoder": "../../data/models/siglip2/image_encoder.bin",
+  "text_encoder": "../../data/models/siglip2/text_encoder.bin",
+  "clutter": {
+    "text": "The workstation is disorganized, with objects scattered across it.",
+    "input_ids": [1175, 113601, 603, 224158, 235269, 675, 9113, 30390, 4492, 665, 235265, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  },
+  "clean": {
+    "text": "Equipment is aligned neatly on a freshly cleaned workstation.",
+    "input_ids": [63034, 603, 44298, 72724, 611, 476, 51644, 31010, 113601, 235265, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  }
+}

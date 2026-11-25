@@ -1,0 +1,10 @@
+[stream]
+camera_id=cam-007
+name=cam-007
+enabled=1
+source_type=rtsp
+rtsp_url=rtsp://192.168.50.140:8556/cam-021
+encoding=h264
+
+[inference]
+scenes=aisle_cart_obstruction,aisle_box_obstruction

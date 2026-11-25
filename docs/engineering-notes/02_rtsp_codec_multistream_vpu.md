@@ -2,6 +2,8 @@
 
 > 本仓库历史实测来自 2026-11-02～11-03 的四路编解码/传输验收，原文和实验输出已整理后删除；16 路分组/VPU 样例为旧仓库 2026-07 的历史实验。所有路数和性能结果都要标注拓扑，不要当作芯片能力保证。
 
+当前 12 路配置、canonical_raw 的帧率协商及历史板端观察分别见 [统一拓扑](../architecture/pipeline_topology.md) 和 [验收记录](../validation/README.md)。
+
 ## 1. H.264 / H.265 和 RTSP TCP / UDP 是两组独立配置
 
 现役 `stream.encoding`：`h264` 或 `h265`，省略时默认 `h264`；H.264 分别由 `rtph264depay/h264parse/v4l2h264dec`，H.265 由对应 `h265` 组件解码。非法 encoding、显式 decoder 不匹配应明确报错；可同时让不同 camera 使用不同 codec，**下游仍须满足同组 NV12/caps 契约**。

@@ -8,12 +8,15 @@
 namespace aibox::siglip {
 class SiglipPipelineBuilder {
  public:
-  explicit SiglipPipelineBuilder(const WorkerConfig& config);
+  explicit SiglipPipelineBuilder(const WorkerConfig& config,
+                                 const std::string& rtsp_url = {});
   ~SiglipPipelineBuilder();
   SiglipPipelineBuilder(const SiglipPipelineBuilder&) = delete;
   SiglipPipelineBuilder& operator=(const SiglipPipelineBuilder&) = delete;
-  Embedding Infer(const std::vector<std::uint8_t>& png, int timeout_ms,
+  Embedding Infer(const std::vector<std::uint8_t>& input, int timeout_ms,
                   const std::function<void()>& heartbeat);
+  // Transfers one reference to the caller.
+  GstSample* PullLiveFrame(GstClockTime timeout);
   void WaitReady();
   void CheckBus();
   void Stop();
@@ -22,6 +25,7 @@ class SiglipPipelineBuilder {
   GstElement* pipeline_ = nullptr;
   GstElement* source_ = nullptr;
   GstElement* sink_ = nullptr;
+  GstElement* live_sink_ = nullptr;
   GstBus* bus_ = nullptr;
   std::uint64_t next_pts_ns_ = 1000000000;
   bool stopped_ = false;

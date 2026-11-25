@@ -4,14 +4,16 @@
 #include <stdexcept>
 
 namespace aibox::siglip {
-Embedding ParseEmbedding(const char* data, std::size_t size, std::uint64_t expected_pts) {
+Embedding ParseEmbedding(const char* data, std::size_t size, std::uint64_t expected_pts,
+                         EmbeddingKind kind) {
   if (size && data[size - 1] == '\0') --size;
   if (!size || std::string(data, size).find('\0') != std::string::npos)
     throw std::runtime_error("invalid embedding JSON buffer length");
   const auto parser = ParseJson(std::string(data, size));
   JsonObject* root = RootObject(parser.get());
-  if (String(root, "type") != "image-embedding" ||
-      String(root, "schema") != "siglip2.image_embedding.v1" ||
+  const bool is_text = kind == EmbeddingKind::Text;
+  if (String(root, "type") != (is_text ? "text-embedding" : "image-embedding") ||
+      String(root, "schema") != (is_text ? "siglip2.text_embedding.v1" : "siglip2.image_embedding.v1") ||
       Integer(root, "dim") != 768)
     throw std::runtime_error("embedding schema mismatch");
   const auto pts = Integer(root, "pts_ns");

@@ -644,6 +644,11 @@ int main(int argc, char** argv) {
   aibox::detection::CaptureTimestampTracker::SetProcessInstance(&capture_tracker);
 
   // --- Register appsink callbacks ---
+  aibox::pipeline::TerminalContext terminal_context{g_aggregator, {}};
+  for (const auto& stream : plan.stream_plans) {
+    terminal_context.profiles.emplace(std::make_pair(stream.camera_id, stream.assigned_algorithm_group_id),
+                                      stream.algorithm_code);
+  }
   auto& appsinks = build_result.value.registry.appsinks;
   std::cout << "[INFO] Registering " << appsinks.size()
             << " appsink callbacks..." << std::endl;
@@ -656,7 +661,7 @@ int main(int argc, char** argv) {
     g_object_set_data_full(G_OBJECT(entry.appsink), "stage-id",
                            g_strdup(entry.stage_id.c_str()), g_free);
     gst_app_sink_set_callbacks(GST_APP_SINK(entry.appsink), &cbs,
-                               &g_aggregator, nullptr);
+                               &terminal_context, nullptr);
     std::cout << "[INFO]   appsink registered: stage=" << entry.stage_id
               << " (terminal/metamux -> aggregator)" << std::endl;
   }

@@ -1,0 +1,19 @@
+[scene]
+name=aisle_box_obstruction
+roi_xyxy=0.4140625,0.37962962962962965,0.7291666666666666,1.0
+prompt_version=aisle-obstruction-box-1974-2827
+
+[positive]
+text=A black rectangular box occupies the center of the factory walkway.
+input_ids=235250,2656,37559,3741,68780,573,5086,576,573,11902,132834,235265,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+[negative]
+text=The factory walkway between the machines is clear.
+input_ids=1175,11902,132834,1865,573,15051,603,3110,235265,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+[rule]
+activation_threshold_pp=55
+recovery_threshold_pp=15
+consecutive_samples=3
+cool_down_secs=45
+repeat_reminder=false

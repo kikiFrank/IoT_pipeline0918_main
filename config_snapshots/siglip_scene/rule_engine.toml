@@ -1,0 +1,25 @@
+[workstation_organization_monitor]
+enabled = true
+camera_id = "cam-011"
+clutter_threshold_pp = 10.0
+recovery_threshold_pp = 15.0
+consecutive_samples = 3
+cool_down_secs = 1
+
+[[siglip2_scene_monitors]]
+enabled = true
+scene = "people_gathering"
+camera_id = "cam-009"
+activation_threshold_pp = 15.0
+recovery_threshold_pp = 15.0
+consecutive_samples = 3
+cool_down_secs = 12
+
+[[siglip2_scene_monitors]]
+enabled = true
+scene = "material_obstruction"
+camera_id = "cam-010"
+activation_threshold_pp = 8.0
+recovery_threshold_pp = 15.0
+consecutive_samples = 3
+cool_down_secs = 5

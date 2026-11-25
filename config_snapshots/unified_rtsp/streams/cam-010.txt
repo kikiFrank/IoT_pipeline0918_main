@@ -1,0 +1,10 @@
+[stream]
+camera_id=cam-010
+name=cam-010
+enabled=1
+source_type=rtsp
+rtsp_url=rtsp://192.168.50.140:8556/cam-041
+encoding=h264
+
+[inference]
+scenes=material_obstruction

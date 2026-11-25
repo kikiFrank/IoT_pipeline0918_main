@@ -1,0 +1,18 @@
+[scene]
+name=workstation_organization
+roi_xyxy=0.22,0.245,0.74,0.945
+prompt_version=experiment-07
+
+[positive]
+text=The workstation is disorganized, with objects scattered across it.
+input_ids=1175,113601,603,224158,235269,675,9113,30390,4492,665,235265,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+[negative]
+text=Equipment is aligned neatly on a freshly cleaned workstation.
+input_ids=63034,603,44298,72724,611,476,51644,31010,113601,235265,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+[rule]
+recovery_threshold_pp=15.0
+consecutive_samples=3
+cool_down_secs=1
+activation_threshold_pp=10.0

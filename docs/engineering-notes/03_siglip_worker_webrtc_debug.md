@@ -2,6 +2,8 @@
 
 > 本仓库历史资料来自 2026-10-28/29 的 SigLIP2 Worker Runbook / Model Notes 和 2026-11 的故障记录，原文已在整理后删除，运行说明已迁入本文；旧 WebRTC/Face/Weston 部分来自旧仓库 2026-08/09。**新 Worker 与旧 Face Worker 不是同一套实现**。
 
+本文的告警图片 Worker Runbook 使用 `aibox_siglip_worker`。当前实时场景使用 `aibox_siglip_scene`，统一启动入口、同一 HTP 的编码顺序及分数契约分别见 [运行生命周期](../architecture/runtime_lifecycle.md) 和 [数据契约](../architecture/data_contracts.md)。
+
 ## 1. SigLIP2 Worker 当前的真实职责与运行边界
 
 业务入口：`event.datamgr.alarm_ready`，使用专属 durable `siglip-worker-alarm-ready-v1`；通过只读 `alarm.list` 获取业务时间/相机，通过 `media.get_meta` 获取原始 JPEG；对**每个 alarm_id** 写出 768 维向量，本地输出 `output/siglip_worker/outbox/`，失败另写 `failures/`。

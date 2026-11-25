@@ -47,6 +47,47 @@ std::uint8_t RoundByte(double value) {
 }
 }  // namespace
 
+std::vector<std::uint8_t> PrepareRgbImage(const std::uint8_t* rgb, int width,
+                                         int height, std::size_t stride) {
+  if (!rgb || width < 1 || height < 1 || stride < static_cast<std::size_t>(width) * 3)
+    throw std::runtime_error("invalid RGB image");
+  constexpr int target = 224;
+  const auto x_taps = BilinearTaps(width, target);
+  const auto y_taps = BilinearTaps(height, target);
+  std::vector<std::uint8_t> horizontal(static_cast<std::size_t>(target) * height * 3);
+  for (int y = 0; y < height; ++y)
+    for (int x = 0; x < target; ++x)
+      for (int channel = 0; channel < 3; ++channel) {
+        double value = 0;
+        for (const auto& tap : x_taps[x])
+          value += rgb[static_cast<std::size_t>(y) * stride + tap.index * 3 + channel] * tap.weight;
+        horizontal[(static_cast<std::size_t>(y) * target + x) * 3 + channel] = RoundByte(value);
+      }
+  std::vector<std::uint8_t> resized(static_cast<std::size_t>(target) * target * 3);
+  for (int y = 0; y < target; ++y)
+    for (int x = 0; x < target; ++x)
+      for (int channel = 0; channel < 3; ++channel) {
+        double value = 0;
+        for (const auto& tap : y_taps[y])
+          value += horizontal[(static_cast<std::size_t>(tap.index) * target + x) * 3 + channel] * tap.weight;
+        resized[(static_cast<std::size_t>(y) * target + x) * 3 + channel] = RoundByte(value);
+      }
+  png_image image{};
+  image.version = PNG_IMAGE_VERSION;
+  image.width = target;
+  image.height = target;
+  image.format = PNG_FORMAT_RGB;
+  std::vector<std::uint8_t> png_bytes;
+  png_alloc_size_t size = 0;
+  if (!png_image_write_to_memory(&image, nullptr, &size, 0, resized.data(), 0, nullptr))
+    throw std::runtime_error("PNG sizing failed");
+  png_bytes.resize(size);
+  if (!png_image_write_to_memory(&image, png_bytes.data(), &size, 0, resized.data(), 0, nullptr))
+    throw std::runtime_error("PNG encoding failed");
+  png_bytes.resize(size);
+  return png_bytes;
+}
+
 PreparedImage PrepareImage(const std::vector<std::uint8_t>& jpeg) {
   if (jpeg.size() < 4 || jpeg[0] != 0xff || jpeg[1] != 0xd8)
     throw std::runtime_error("source is not JPEG");
@@ -96,41 +137,7 @@ PreparedImage PrepareImage(const std::vector<std::uint8_t>& jpeg) {
   jpeg_destroy_decompress(&decoder);
   std::unique_ptr<unsigned char, decltype(&std::free)> pixels(error->pixels, &std::free);
   error->pixels = nullptr;
-  const auto* rgb = pixels.get();
-
-  constexpr int target = 224;
-  const auto x_taps = BilinearTaps(width, target);
-  const auto y_taps = BilinearTaps(height, target);
-  std::vector<std::uint8_t> horizontal(static_cast<std::size_t>(target) * height * 3);
-  for (int y = 0; y < height; ++y)
-    for (int x = 0; x < target; ++x)
-      for (int channel = 0; channel < 3; ++channel) {
-        double value = 0;
-        for (const auto& tap : x_taps[x])
-          value += rgb[(static_cast<std::size_t>(y) * width + tap.index) * 3 + channel] * tap.weight;
-        horizontal[(static_cast<std::size_t>(y) * target + x) * 3 + channel] = RoundByte(value);
-      }
-  std::vector<std::uint8_t> resized(static_cast<std::size_t>(target) * target * 3);
-  for (int y = 0; y < target; ++y)
-    for (int x = 0; x < target; ++x)
-      for (int channel = 0; channel < 3; ++channel) {
-        double value = 0;
-        for (const auto& tap : y_taps[y])
-          value += horizontal[(static_cast<std::size_t>(tap.index) * target + x) * 3 + channel] * tap.weight;
-        resized[(static_cast<std::size_t>(y) * target + x) * 3 + channel] = RoundByte(value);
-      }
-  png_image image{};
-  image.version = PNG_IMAGE_VERSION;
-  image.width = target;
-  image.height = target;
-  image.format = PNG_FORMAT_RGB;
-  png_alloc_size_t size = 0;
-  if (!png_image_write_to_memory(&image, nullptr, &size, 0, resized.data(), 0, nullptr))
-    throw std::runtime_error("PNG sizing failed");
-  result.png.resize(size);
-  if (!png_image_write_to_memory(&image, result.png.data(), &size, 0, resized.data(), 0, nullptr))
-    throw std::runtime_error("PNG encoding failed");
-  result.png.resize(size);
+  result.png = PrepareRgbImage(pixels.get(), width, height, static_cast<std::size_t>(width) * 3);
   result.inference_sha256 = Sha256(result.png.data(), result.png.size());
   return result;
 }

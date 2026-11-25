@@ -1,0 +1,19 @@
+[scene]
+name=aisle_cart_obstruction
+roi_xyxy=0.4140625,0.37962962962962965,0.7291666666666666,1.0
+prompt_version=aisle-obstruction-cart-742-874
+
+[positive]
+text=A wheeled rack sits in the middle of the factory walkway.
+input_ids=235250,138830,23409,27505,575,573,7185,576,573,11902,132834,235265,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+[negative]
+text=The factory walkway between the work areas is clear.
+input_ids=1175,11902,132834,1865,573,1160,4516,603,3110,235265,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+[rule]
+activation_threshold_pp=55
+recovery_threshold_pp=15
+consecutive_samples=3
+cool_down_secs=45
+repeat_reminder=false

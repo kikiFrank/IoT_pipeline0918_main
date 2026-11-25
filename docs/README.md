@@ -10,9 +10,11 @@
 
 架构描述以当前代码为依据；历史经验保留原时间与适用边界；正式验收必须链接对应任务证据。四者互相引用，不复制同一份内容。项目源码目录保持现有职责划分；本次调整的是文档信息架构。
 
-## 本次架构引入
+## 当前运行入口
 
-按照 `PIPELINE_DOCS_BUILD_GUIDE.md` 的目标结构，将配套目录中已解压的七篇架构草稿核对后迁入 `architecture/`。差异、代码内部不一致及需要用户确认的问题见 [审核报告](architecture/REVIEW.md)。原工程知识库及 tests 两篇 Markdown 的未提交修改保持原样。
+主工作区使用 `scripts/start_rtsp.sh` 和 `scripts/stop_rtsp.sh` 管理 12 路。默认读取 `config/unified_rtsp.json`。进程、拓扑和跨服务契约见架构文档，既有板端记录见验收索引。[运行生命周期](architecture/runtime_lifecycle.md) · [系统总览](architecture/system_overview.md) · [板端验收](validation/README.md)
+
+2026-11-08 的草稿迁入记录和当时待核对项见 [历史审核报告](architecture/REVIEW.md)。
 
 ## 后续同步规则
 

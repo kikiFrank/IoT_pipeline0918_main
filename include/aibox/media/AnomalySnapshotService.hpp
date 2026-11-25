@@ -34,6 +34,7 @@ struct AlarmSnapshotRequest {
   std::string frame_id;
   int64_t occurred_at_ms = 0;
   std::string source_event_id;
+  bool exact_frame = false;
 };
 
 struct SnapshotTask {
@@ -50,6 +51,7 @@ struct SnapshotTask {
   bool alarm_mode = false;
   std::string alarm_id;
   std::string frame_id;
+  bool exact_frame = false;
   int64_t max_delta_ms = 500;
 
   void Release();

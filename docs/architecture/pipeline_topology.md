@@ -1,7 +1,6 @@
 # Pipeline 拓扑与运行模式
 
-> 代码核对基线：`b878219`；核对日期：2026-11-08。本文由外部架构草稿逐项对照本地源码后整理。
-> `verified` = 当前源码/配置直接支持；`inferred` = 结构推断；`board-verified` = 当前版本有板端证据；`needs-confirmation` = 证据不足。本次只读代码，未新增 board-verified 结论。
+> 源码核对日期 2026-11-25。基准为主工作区当前源码及配置。既有板端证据见 [验收索引](../validation/README.md)。
 
 ## 1. 构图入口与模式（verified）
 
@@ -52,7 +51,13 @@ Builder 可按 `AIBOX_WEBRTC_SPLITTER=camsplit` 使用 appsink/appsrc 拷贝式 
 - `--record` 打开独立 mosaic compositor/encoder/matroskamux/filesink；不等同于每相机标注输出。录像关闭前需 EOS 收尾。
 - 无标注模式仍有 FPS 等终端路径；可选 qtifaceinfer/诊断 taps 会进一步改变图。具体条件在 Builder 内，不能仅凭插件目录判定每次启用。
 
-## 6. 当前快照与下一次板端验证
+## 6. 统一 RTSP 当前拓扑
+
+[主工作区统一 JSON](../../config/unified_rtsp.json) 配置 8 路 CNN 和 4 路实时 SigLIP2，分配见 [系统总览](system_overview.md)。CNN 进程从渲染的 TXT 读取 PPE 与 Light 两个 profile，使用 `batch=1`。SigLIP2 每个相机进程持有自己的 RTSP 和 Image Encoder。cam-007 的两组词在同一进程中使用同帧图像向量，因此该路只开启一份实时图像链。当前统一入口校验每条 URL 在配置中只出现一次。[Supervisor](../../tools/rtsp_supervisor.py) · [场景主程序](../../src/siglip_worker/SceneMain.cpp)
+
+TimeMux 选用 `canonical_raw`，主配置给出 1920×1080 NV12、progressive 的 group caps。插件比较可归一化差异时去掉 framerate 和 colorimetry，输出 canonical caps 声明可变帧率 `0/1`。这些协商规则允许同组输入的帧率不同，保留其他 caps 检查。输出吞吐与每路标注播放仍需用实际连接测量。[TimeMux 实现](../../plugins/aiboxtimemux/gstaiboxtimemux.cpp)
+
+## 7. 历史快照与运行证据
 
 [PPE](../../config_snapshots/ppe_4cam/pipeline_ppe_4cam.txt) 与 [单阶段 Andon](../../config_snapshots/1stage_andon_4cam/pipeline_1stage_andon_4cam.txt) 的配置值见 [系统总览](system_overview.md)。四路 enabled、batch=1、max_group_size=6 与 max_streams=16 是不同维度。
 

@@ -1,0 +1,18 @@
+[scene]
+name=material_obstruction
+roi_xyxy=0.3229166666666667,0.44907407407407407,0.671875,1.0
+prompt_version=material_obstruction-refined-011
+
+[positive]
+text=A wheeled material bin occupies the center of the factory walkway.
+input_ids=235250,138830,2893,8881,68780,573,5086,576,573,11902,132834,235265,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+[negative]
+text=The walking lane in the factory walkway is clear all the way through.
+input_ids=1175,10350,25356,575,573,11902,132834,603,3110,832,573,1703,1593,235265,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+[rule]
+activation_threshold_pp=8.0
+recovery_threshold_pp=15.0
+consecutive_samples=3
+cool_down_secs=5

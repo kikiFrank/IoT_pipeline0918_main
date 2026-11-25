@@ -2,6 +2,8 @@
 
 > 本仓库历史案例：2026-10-29 至 11-03 的 PPE、Andon V2/V3、1stage Andon、Raisehands 及问题记录，原文已在整理后删除；旧仓库案例来自 `IoT_pipeline_0918` 的 QNN、GStreamer/Builder 排障。历史实验结论须结合当前代码与实际板端再次核实。
 
+当前统一 PPE 1123 和 Light 1121 的模型描述、阈值及标签见 [数据契约](../architecture/data_contracts.md)。以下旧模型记录及配置随对应历史验收阅读。
+
 ## 1. 更换模型先锁定六层契约
 
 1. **模型文件**：SHA256、QAIRT/QNN 版本、Backend 和 SoC/HTP 能力。

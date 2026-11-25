@@ -214,6 +214,7 @@ bool AnomalySnapshotService::EnqueueAlarmSnapshotRequest(
   task.alarm_id = request.alarm_id;
   task.camera_id = request.camera_id;
   task.frame_id = request.frame_id;
+  task.exact_frame = request.exact_frame;
   task.timestamp_ms = request.occurred_at_ms;
 
   while (alarm_queue_.size() >= kDefaultAlarmQueueDepth) {
@@ -505,7 +506,8 @@ void AnomalySnapshotService::ProcessAlarmTask(SnapshotTask task) {
       return;
     }
     CachedFrame frame;
-    if (!cache->Find(task.camera_id, task.frame_id, task.timestamp_ms,
+    if (!cache->Find(task.camera_id, task.frame_id,
+                     task.exact_frame ? 0 : task.timestamp_ms,
                      task.max_delta_ms, frame)) {
       // 没有时间足够接近的帧：如实报告，而不是拿旧照片充数。
       std::cerr << "[WARN] snapshot miss: cam=" << task.camera_id
