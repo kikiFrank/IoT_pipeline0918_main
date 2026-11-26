@@ -78,11 +78,7 @@ echo NATS_OK
 # scripts/aibox_graphics_gate.sh (shared with tmp A/B runs).
 # shellcheck disable=SC1091
 . "$R/scripts/aibox_graphics_gate.sh"
-# The dedicated service owns the compositor, independent of GDM.
-if ! systemctl is-active --quiet aibox-weston.service; then
-  echo "GFX_WESTON_START: aibox-weston.service"
-  sudo -n systemctl start aibox-weston.service || exit 7
-fi
+bash "$R/scripts/_start_adreno_weston_forceon.sh" || exit 7
 aibox_graphics_gate_for_start || exit 7
 
 aibox_vpu_gate_for_start "$R" || exit 8

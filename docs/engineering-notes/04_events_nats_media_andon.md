@@ -2,11 +2,13 @@
 
 > 把本仓库 2026-11-02/03 的历史链路验收与旧仓库 2026-08 的事件合约实验严格分开。原验收文档和实验输出已整理后删除，本文保留当时条件与结果。**检测结果传输成功，不等于颜色语义/报警规则/图片上传已完成**。
 
+当前 CNN、SigLIP2、PPE 告警与媒体 v2 的端到端边界见 [数据契约](../architecture/data_contracts.md) 和 [微服务告警链路](../../../IoT_edge/aibox/arch_docs/Detection_Alarm_MediaUpload_Chain.md)。第 5 节继续描述 CNN 的检测触发及告警请求两条取图路径。
+
 ## 1. 三个不同层面的“事件通过”
 
 | 层 | 典型数据 | 实测和未验证边界 |
 |---|---|---|
-| 检测传输 | `detection.frame` Protobuf v2，`coordinate_space=NORMALIZED`，`camera_id`、bbox、class | 1stage Andon、Raisehands 当前四路订阅解码通过；只证明该版本的事件传输及标签检查 |
+| 检测传输 | `detection.frame` Protobuf v2，`coordinate_space=NORMALIZED`，`camera_id`、bbox、class | 历史 1stage Andon、Raisehands 各有四路订阅解码通过，覆盖对应版本的传输及标签检查 |
 | 原生分类/画面 | `parent-id` 绑定的灯色/手势、appsink native metadata、overlay | 双模型 Andon 和 Raisehands 逐 ROI 绑定/画面可见；当前 detection.frame 不携带独立颜色/手势属性 |
 | 业务告警/图片 | rule-engine → alarm/ready → data-manager/media-upload/云端 | 此仓库的 Pipeline 测试不能单独证明微服务、SigmaForge 页面每事件有图，需跨仓联测 |
 
@@ -82,6 +84,16 @@ all  : camera_id 有效、RTSP可抓帧、NATS 可解码、停止到 NULL、iris
 本次资料包称：`IoT_pipeline_0918/test/media_snapshot/IR-DATA-002_验收测试记录.md` 与 `test/media_upload/IR-UPLOAD-001_验收测试记录.md` 是空副本，而更早的 `IoT_pipeline` 同名记录有内容。本次工作区未提供这两个旧仓库原件，因此**不能独立确认文件大小、原报告数字或通过状态**；此前“两个历史仓库的记录均为空”的概括也不应继续作为定论。
 
 资料包摘录的旧 `IoT_pipeline` 报告称：2026-08-20 的 40 秒单路实验有 13 张 JPEG、53 条 `media_ready`；2026-08-27 的 60 秒 mock S3 实验有 49 条 `event.media.uploaded`，并观察到约 0.6% 的 alarm→upload 比例。这些是**待原报告核对的历史摘录**，不代表每个 detection/alarm 都有图，也不代表当前生产云端上传通过；0.6% 不能当作当前目标或验收阈值。若需作为正式验收证据，应取得原报告、相应提交与日志后核对测试环境、消息关联键和计数口径。
+
+### 5.5 Events 截图的 Zone 热更新
+
+CNN 与实时 SigLIP2 Scene 使用同一个抓拍服务。`AnomalySnapshotService::EncodeWriteAndThumbnail` 在自己的 packed NV12 图像副本上按相机绘制启用的 Zone，再编码 JPEG 并由同一画面生成缩略图。检测触发和告警请求的新编码路径都经过这里。已有抓拍的复用、精确帧与就近帧匹配沿用各自的策略。[抓拍实现](../../src/media/AnomalySnapshotService.cpp) · [Zone 绘制实现](../../src/media/SnapshotZoneOverlay.cpp)
+
+每路按启用 Zone 的顺序循环使用 `#0A84FF`、`#A855F7`、`#00D4AA`、`#FFA502`、`#FF4757`、`#2ED573`。边线完全不透明，填充的不透明度为 `0x14 / 255`，约 7.84%，与 Live View 的 SVG 样式一致。颜色按顺序计算，因此移除或禁用某个 Zone 后，后续 Zone 的颜色可能顺移。[Live View Zone 组件](../../../IoT_edge/aibox-web/src/components/ZoneOverlay.tsx)
+
+新增、修改、禁用或删除 Zone 在新版本快照生效后反映到新编码的图片上。已有 JPEG 和缩略图保留写入时的 Zone，复用旧素材时也保留原样。Live View 的 `display zones` 由前端独立绘制，标注 RTSP／WebRTC 沿用原有的推理叠加链路。抓拍功能复用现有 Zone 配置和媒体接口。[Zone 消息契约](../architecture/data_contracts.md#4-nats-主题载荷与-rust-对端)
+
+2026-11-25 板端 12 路受控测试检查了 48 张 JPEG 和对应的 48 张缩略图。样式实测覆盖六色循环、回绕与填充。业务样本覆盖 Mock-02（PPE，`ready_near`）、Mock-05（Light）和 Mock-11（SigLIP2，`ready`），验证范围为本地生成和 Events 媒体关联。
 
 ## 6. Andon 时序历史计划：只留边界案例，**不是已验收结果**
 

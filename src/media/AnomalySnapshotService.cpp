@@ -184,6 +184,10 @@ void AnomalySnapshotService::SetFrameCache(FrameSnapshotCache* cache) {
   frame_cache_ = cache;
 }
 
+void AnomalySnapshotService::SetFrameOverlay(FrameOverlay overlay) {
+  frame_overlay_ = std::move(overlay);
+}
+
 bool AnomalySnapshotService::EnqueueAlarmSnapshotRequest(
     AlarmSnapshotRequest request) {
   if (request.alarm_id.empty() || request.camera_id.empty()) {
@@ -214,6 +218,7 @@ bool AnomalySnapshotService::EnqueueAlarmSnapshotRequest(
   task.alarm_id = request.alarm_id;
   task.camera_id = request.camera_id;
   task.frame_id = request.frame_id;
+  task.exact_frame = request.exact_frame;
   task.timestamp_ms = request.occurred_at_ms;
 
   while (alarm_queue_.size() >= kDefaultAlarmQueueDepth) {
@@ -367,7 +372,7 @@ void AnomalySnapshotService::ProcessTask(SnapshotTask task) {
   }
 
   const SnapshotArtifacts artifacts = EncodeWriteAndThumbnail(
-      packed, width, height, task.representative_event_id);
+      task.camera_id, packed, width, height, task.representative_event_id);
   if (artifacts.error != nullptr) {
     return;
   }
@@ -390,9 +395,11 @@ void AnomalySnapshotService::ProcessTask(SnapshotTask task) {
 
 AnomalySnapshotService::SnapshotArtifacts
 AnomalySnapshotService::EncodeWriteAndThumbnail(
-    const std::vector<uint8_t>& packed, uint32_t width, uint32_t height,
+    const std::string& camera_id, std::vector<uint8_t>& packed,
+    uint32_t width, uint32_t height,
     const std::string& asset_id) {
   SnapshotArtifacts out;
+  if (frame_overlay_ && !packed.empty()) frame_overlay_(camera_id, packed, width, height);
 
   std::vector<uint8_t> jpeg;
   if (packed.empty() ||
@@ -505,7 +512,8 @@ void AnomalySnapshotService::ProcessAlarmTask(SnapshotTask task) {
       return;
     }
     CachedFrame frame;
-    if (!cache->Find(task.camera_id, task.frame_id, task.timestamp_ms,
+    if (!cache->Find(task.camera_id, task.frame_id,
+                     task.exact_frame ? 0 : task.timestamp_ms,
                      task.max_delta_ms, frame)) {
       // 没有时间足够接近的帧：如实报告，而不是拿旧照片充数。
       std::cerr << "[WARN] snapshot miss: cam=" << task.camera_id
@@ -532,7 +540,7 @@ void AnomalySnapshotService::ProcessAlarmTask(SnapshotTask task) {
       AssetIdFor(task.camera_id, task.frame_id, task.timestamp_ms);
 
   const SnapshotArtifacts artifacts = EncodeWriteAndThumbnail(
-      task.packed_nv12, task.width, task.height, asset_id);
+      task.camera_id, task.packed_nv12, task.width, task.height, asset_id);
   if (artifacts.error != nullptr) {
     fail(artifacts.error);
     return;

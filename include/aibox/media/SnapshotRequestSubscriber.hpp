@@ -18,11 +18,14 @@ namespace aibox::media {
 class SnapshotRequestSubscriber {
  public:
   static constexpr const char* kSubject = "event.pipeline.snapshot.request";
+  static constexpr const char* kSiglip2Subject = "event.pipeline.snapshot.request.siglip2";
   static constexpr const char* kFailedSubject =
       "event.pipeline.snapshot.failed";
 
   SnapshotRequestSubscriber(aibox::adapter::NatsAdapter& nats,
-                            AnomalySnapshotService& service);
+                            AnomalySnapshotService& service,
+                            std::string subject = kSubject,
+                            std::string camera_id = {});
   ~SnapshotRequestSubscriber();
 
   SnapshotRequestSubscriber(const SnapshotRequestSubscriber&) = delete;
@@ -47,6 +50,8 @@ class SnapshotRequestSubscriber {
 
   aibox::adapter::NatsAdapter& nats_;
   AnomalySnapshotService& service_;
+  const std::string subject_;
+  const std::string camera_id_;
   std::atomic<bool> started_{false};
   std::atomic<uint64_t> received_{0};
   std::atomic<uint64_t> rejected_{0};

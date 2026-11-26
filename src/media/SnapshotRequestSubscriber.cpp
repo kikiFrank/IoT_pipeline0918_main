@@ -64,8 +64,10 @@ bool ExtractInt64(const std::string& json, const std::string& key,
 }  // namespace
 
 SnapshotRequestSubscriber::SnapshotRequestSubscriber(
-    aibox::adapter::NatsAdapter& nats, AnomalySnapshotService& service)
-    : nats_(nats), service_(service) {}
+    aibox::adapter::NatsAdapter& nats, AnomalySnapshotService& service,
+    std::string subject, std::string camera_id)
+    : nats_(nats), service_(service), subject_(std::move(subject)),
+      camera_id_(std::move(camera_id)) {}
 
 SnapshotRequestSubscriber::~SnapshotRequestSubscriber() { Stop(); }
 
@@ -99,7 +101,7 @@ bool SnapshotRequestSubscriber::Start() {
   });
 
   const bool ok = nats_.Subscribe(
-      kSubject, [this](const std::string& subject, const std::string& reply,
+      subject_, [this](const std::string& subject, const std::string& reply,
                        const std::string& payload) {
         OnMessage(subject, reply, payload);
       });
@@ -109,7 +111,7 @@ bool SnapshotRequestSubscriber::Start() {
     std::cerr << "[WARN] snapshot request subscribe failed subject="
               << kSubject << std::endl;
   } else {
-    std::cout << "[INFO] SnapshotRequestSubscriber listening on " << kSubject
+    std::cout << "[INFO] SnapshotRequestSubscriber listening on " << subject_
               << std::endl;
   }
   return ok;
@@ -117,7 +119,7 @@ bool SnapshotRequestSubscriber::Start() {
 
 void SnapshotRequestSubscriber::Stop() {
   if (!started_.exchange(false)) return;
-  nats_.Unsubscribe(kSubject);
+  nats_.Unsubscribe(subject_);
   // 该 sink 捕获了 `this`；必须在本对象销毁前清除。
   service_.SetFailureSink(nullptr);
 }
@@ -132,7 +134,9 @@ void SnapshotRequestSubscriber::OnMessage(const std::string& /*subject*/,
               << std::endl;
     return;
   }
+  if (!camera_id_.empty() && request.camera_id != camera_id_) return;
   received_.fetch_add(1);
+  request.exact_frame = subject_ == kSiglip2Subject;
 
   // 这里只做解析和入队。编码和磁盘 I/O 都在服务的
   // worker 线程上进行，绝不在此处执行。

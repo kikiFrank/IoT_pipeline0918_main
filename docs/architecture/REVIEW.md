@@ -1,4 +1,6 @@
-# 架构文档迁入核对报告与待审核事项
+# 架构文档迁入历史记录与当期待审核事项
+
+> 以下保留 2026-11-08 迁入时的核对结果和问题清单。当前统一 RTSP 进程所有权、启停和板端运行证据见 [运行生命周期](runtime_lifecycle.md) 与 [验收记录](../validation/README.md)。当前跨服务契约已对照同一工作区的 Rust 实现。[数据契约](data_contracts.md)
 
 - 日期：2026-11-08
 - 代码基线：`b878219`（分支 master）
@@ -48,7 +50,7 @@
 | C5 `verified`：READY_FOR_BROWSER 不代表浏览器链验收 | start common 约第 138–142 行按 AGG **总行数** 达阈值后输出标记，并非每路唯一相机覆盖，也没有 HTML/8080 服务 | 后续发布门禁是否应要求每相机进展及客户端实际取流？当前文档不提升该标记含义 |
 | C6 `verified`：运行脚本可能恢复图形/VPU | start common 第 60 行附近默认 if-needed、无 Weston 时 auto-start；[vpu_health](../../scripts/vpu_health.sh) 可 sudo 调 reset_vpu；CNN stop 进程退出后亦会检查并恢复。只有 build 脚本声明不重置 | 这是当前操作策略，是否继续保留需由现场维护要求决定；不能把启动/停止解释成无设备副作用 |
 | C7 `verified`：ABI quartet 的切换不是多文件原子事务 | [board_build_unified.sh](../../scripts/board_build_unified.sh) 第 125 行打印 atomic switch，第 126–129 行实际逐个 cp 四个 .so；staging/摘要并不提供事务原子性 | 若需允许在线构建/部署，是否另行设计停机或版本目录切换？本次仅修正文档描述 |
-| C8 `needs-confirmation`：PPE 输出 dtype 资料不一致 | [模型 descriptor](../../config_snapshots/ppe_4cam/models/yolox_ppe_w8a16.txt) output.dtype=uint16，而[历史工程记录](../engineering-notes/01_models_preprocess_qnn.md) 记录 QNN 下游 FLOAT32 [1,8400,8]。后处理兼容多种 Tensor 不足以判定当前运行边界 | 请用当前 BIN、SDK、插件与配置采集真实 Tensor dtype/shape/量化参数，确认是声明滞后、转换边界不同或版本不同；暂不改配置/历史数值 |
+| C8 `needs-confirmation`：历史 PPE 输出 dtype 资料不一致 | 旧配置声明 `output.dtype=uint16`，同期工程笔记记录 QNN 下游 FLOAT32 `[1,8400,8]`。[历史 PPE descriptor](https://github.com/kikiFrank/IoT_pipeline0918_main/blob/5e40fe10b2d3057f59f3b40e2403f7e6680cfee3/config_snapshots/ppe_4cam/models/yolox_ppe_w8a16.txt) · [历史工程记录](../engineering-notes/01_models_preprocess_qnn.md) | 按待核实的模型 BIN、SDK、插件与配置采集真实 Tensor dtype、shape 和量化参数，并记录具体的输出边界。 |
 
 ## 5. 证据不足，需后续补充（needs-confirmation）
 

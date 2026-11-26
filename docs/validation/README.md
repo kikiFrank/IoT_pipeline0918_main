@@ -1,6 +1,37 @@
 # 正式验证与板端验收索引
 
-本目录记录明确版本与环境的正式测试矩阵和验收摘要。当前未新增正式板端记录；[工程知识库](../engineering-notes/README.md) 中旧结果仍是历史资料，不自动升级为当前版本 board-verified。
+本目录记录明确版本与环境的测试矩阵和验收摘要。[工程知识库](../engineering-notes/README.md) 保留不同版本的历史结果。
+
+## 2026-11-26 · 165 板端统一 RTSP 启停
+
+验收目录为 `/mnt/workspace/1126/ai-box_stream_pipeline`，使用 `bash scripts/start_all/start_rtsp.sh` 正常启动，就绪后连续观测，再显式执行 `bash scripts/start_all/stop_rtsp.sh`。[启停入口与就绪判据](../architecture/runtime_lifecycle.md#2-统一-rtsp-启停)
+
+| 范围 | 当次证据 |
+|---|---|
+| 板端构建 | 1126 目录构建完成，日志为 `/mnt/workspace/1126/build-1126.log` |
+| 首轮 `run-e4_gyx7n` | 复用已有 unit，专用 headless/Pixman Weston 冷启动后通过 `GFX_GATE_OK`。GDM 和实体 X11 会话继续运行。期间短暂发生 SSH/Ping 断连，SigLIP2 的 `cam-007` 打不开源 RTSP，该轮未达到统一就绪，断连原因未确认 |
+| 重试 `run-iueunxoh` | Ready 后连续观察 60.9 秒。8 路 CNN 有帧进展，4 路 SigLIP2 的 5 个场景有分数进展。8 路标注 RTSP 均实拉验证为 H.264、1920×1080。GDM 的 PID 保持一致，实体 X11 会话处于活动状态 |
+| 停止 | 本次 supervisor、一个 CNN 与四个 SigLIP2 Scene 进程退出，标注 RTSP 端口 8555 释放 |
+
+板端记录位于 `/mnt/workspace/1126/`，包括 `start-1126.log`、`acceptance-1126-retry.log`、`stop-1126-retry.log`。重试各进程日志位于 pipeline 目录下的 `output/unified_rtsp/run-iueunxoh/`。本轮验证短时运行、可拉流和停止收尾。长时间资源上限、反复启停、推理精度与完整业务告警链需分别验收。
+
+## 2026-11-26 · 165 板端微服务重启
+
+修正 systemd 启动路径后，9 个微服务处于运行状态，`/health` 返回正常，12 路摄像头和 4 个 Zone 的 ID 与重启前一致。JetStream Projector consumer 可用，1126 Pipeline 的 `--check` 通过。NATS、MediaMTX、GDM 和专用 Weston 在操作期间保持运行，Pipeline 在本次微服务重启时处于停止状态。[持久化部署说明](../architecture/runtime_lifecycle.md#5-165-板端微服务持久化部署)
+
+## 2026-11-25 · 165 板端统一 RTSP 与 PPE 上报
+
+验收从 `/mnt/workspace/1125test_simplify/ai-box_stream_pipeline` 运行当时的统一启动入口。启动日志给出的 run 为 `output/unified_rtsp/run-a59wc6ar`。此次使用板端最简 TXT 快照入口，在全部就绪后观察超过 120 秒。运行和停止证据属于当次板端版本，现行命令见[运行生命周期](../architecture/runtime_lifecycle.md)。
+
+| 范围 | 当次证据 |
+|---|---|
+| 推理链进展 | 8 路 CNN 产生逐帧事件，4 路 SigLIP2 产生分数。观测结束时 supervisor 状态为 `ready` |
+| PPE 业务事件 | 四路共 49 条规则事件，逐条对应 `alarm.event`、SQLite 告警行和 MQTT 客户端日志 |
+| 推理帧关联 | 另一个采样窗口有 23 条 PPE 事件，人员检测 ID、类别和框均匹配对应源帧 |
+| 本地图片、远端图片 | 40 条关联为 `ready`，9 条为 `ready_near`。当次图片上传状态尚为 `pending`，MQTT 客户端日志记录与远端图片回执分别核验 |
+| 停止 | 通过当时的统一停止入口，本次 supervisor 和五个工作进程退出，检查时已无到 RTSP 源服务器的连接 |
+
+规则验收未计算逐人识别精度。本次文档核对使用已有日志摘要。各条告警和上传证据口径见 [微服务端到端盘点](../../../IoT_edge/aibox/arch_docs/Detection_to_MediaUpload_E2E_Completeness.md)。
 
 ## 任务资料与正式摘要
 

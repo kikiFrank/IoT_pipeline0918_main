@@ -60,6 +60,7 @@ list(APPEND MAIN_SOURCES
     src/media/NatsMediaReadyTransport.cpp
     src/media/SnapshotTriggerPolicy.cpp
     src/media/AnomalySnapshotService.cpp
+    src/media/SnapshotZoneOverlay.cpp
     src/media/SnapshotRequestSubscriber.cpp
     src/control/PipelineControlServer.cpp)
 
@@ -108,6 +109,9 @@ if(QTI_SOURCE_ROOT)
 endif()
 
 pkg_check_modules(JSONGLIB REQUIRED json-glib-1.0)
+pkg_check_modules(CAIRO REQUIRED IMPORTED_TARGET cairo)
+target_include_directories(aibox_stream_pipeline_demo PRIVATE ${JSONGLIB_INCLUDE_DIRS})
+target_link_libraries(aibox_stream_pipeline_demo ${JSONGLIB_LIBRARIES} PkgConfig::CAIRO)
 pkg_check_modules(JPEG REQUIRED libjpeg)
 pkg_check_modules(PNG REQUIRED libpng)
 find_package(OpenSSL REQUIRED)
@@ -137,6 +141,32 @@ target_include_directories(aibox_siglip_worker PRIVATE
 target_link_libraries(aibox_siglip_worker PRIVATE
     aibox_siglip_core ${GST_LIBRARIES} ${GST_APP_LIBRARIES}
     ${NATS_LIBRARIES} Threads::Threads)
+add_executable(aibox_siglip_scene
+    src/siglip_worker/SceneMain.cpp
+    src/siglip_worker/SiglipPipelineBuilder.cpp
+    src/pipeline/GstElementHelper.cpp
+    src/adapter/NatsAdapter.cpp
+    src/detection/Uuid.cpp
+    src/media/SnapshotEncoder.cpp
+    src/media/ThumbnailEncoder.cpp
+    src/media/MediaFileWriter.cpp
+    src/media/NatsMediaReadyTransport.cpp
+    src/media/SnapshotTriggerPolicy.cpp
+    src/media/AnomalySnapshotService.cpp
+    src/media/SnapshotZoneOverlay.cpp
+    src/media/SnapshotRequestSubscriber.cpp)
+target_include_directories(aibox_siglip_scene PRIVATE
+    ${GST_INCLUDE_DIRS} ${GST_APP_INCLUDE_DIRS} ${GST_VIDEO_INCLUDE_DIRS}
+    ${NATS_INCLUDE_DIRS} ${UUID_INCLUDE_DIRS})
+target_link_libraries(aibox_siglip_scene PRIVATE
+    aibox_siglip_core aibox_frame_cache ${GST_LIBRARIES} ${GST_APP_LIBRARIES}
+    ${GST_VIDEO_LIBRARIES} ${NATS_LIBRARIES} ${UUID_LIBRARIES} Threads::Threads PkgConfig::CAIRO)
+if(QTI_SOURCE_ROOT)
+    target_include_directories(aibox_siglip_scene PRIVATE ${QTI_SOURCE_ROOT})
+    target_compile_definitions(aibox_siglip_scene PRIVATE AIBOX_SIGLIP_QTI_METADATA=1)
+    target_link_libraries(aibox_siglip_scene PRIVATE
+        /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}/libgstqtimlbase.so.1)
+endif()
 if(BUILD_TESTING)
     target_compile_definitions(aibox_siglip_worker PRIVATE SIGLIP_TEST_HOOKS=1)
     add_executable(siglip_preprocess_probe tests/siglip_worker/preprocess_probe.cpp)
@@ -168,11 +198,6 @@ if(BUILD_TESTING)
     target_link_libraries(snapshot_service_test PRIVATE
         aibox_frame_cache ${GST_LIBRARIES} ${GST_VIDEO_LIBRARIES} Threads::Threads)
     add_test(NAME snapshot_service_test COMMAND snapshot_service_test)
-    add_test(NAME frame_cache_config_test
-        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_frame_cache_config.sh
-                $<TARGET_FILE:aibox_stream_pipeline_demo>
-                ${CMAKE_CURRENT_SOURCE_DIR}/config_snapshots/demo_2stage_yolo_serial/pipeline_otm_12cam_webrtc.txt
-    )
     add_executable(siglip_worker_core_test tests/siglip_worker/core_test.cpp)
     target_link_libraries(siglip_worker_core_test PRIVATE aibox_siglip_core)
     add_test(NAME siglip_worker_core_test COMMAND siglip_worker_core_test)
@@ -226,7 +251,7 @@ if(BUILD_TESTING)
         ${TEST_LABEL_ROOT}/ppe_4cam/labels/ppe_labels.txt
         ${TEST_LABEL_ROOT}/andon_4cam/labels/stacklight.txt)
     add_test(NAME ppe_gesture1121_postprocess_test COMMAND ppe_gesture1121_postprocess_test
-        ${TEST_LABEL_ROOT}/ppe_gesture1121/labels/classes.txt)
+        ${TEST_LABEL_ROOT}/ppe_gesture1123/labels/classes.txt)
     add_test(NAME gesture_postprocess_test COMMAND gesture_postprocess_test
         ${TEST_LABEL_ROOT}/raisehands_4cam/labels/gesture_labels.txt)
 endif()

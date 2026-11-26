@@ -1,9 +1,20 @@
 #pragma once
 
+#include <map>
+#include <string>
+#include <utility>
+
 #include <gst/gst.h>
 #include <gst/app/gstappsink.h>
 
+namespace aibox::aggregator { class ResultAggregator; }
+
 namespace aibox::pipeline {
+
+struct TerminalContext {
+  aggregator::ResultAggregator& aggregator;
+  std::map<std::pair<std::string, std::string>, std::string> profiles;
+};
 
 // ===================================================================
 // Phase 1 terminal callback (debug/verify only): reads frame meta + iterates
@@ -18,7 +29,7 @@ GstFlowReturn OnTerminalSamplePrint(GstAppSink* sink, gpointer user_data);
 // This is the extraction step that replaces the old C++ cross-stage join
 // (fusion already happened in-pipeline via qtimetamux).
 //
-//   user_data MUST be a valid aibox::aggregator::ResultAggregator*.
+//   user_data MUST be a valid TerminalContext*.
 // ===================================================================
 GstFlowReturn OnTerminalSampleToAggregator(GstAppSink* sink, gpointer user_data);
 

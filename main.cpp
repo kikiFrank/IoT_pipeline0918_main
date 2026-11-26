@@ -35,6 +35,7 @@
 #include "aibox/media/MediaFileWriter.hpp"
 #include "aibox/media/NatsMediaReadyTransport.hpp"
 #include "aibox/media/SnapshotEncoder.hpp"
+#include "aibox/media/SnapshotZoneOverlay.hpp"
 #include "aibox/media/ThumbnailEncoder.hpp"
 
 // ===================================================================
@@ -82,9 +83,10 @@ static void PrintHelp(const char* prog) {
   std::cout << "  --media-dir <path>        JPEG snapshot directory (default: $AIBOX_MEDIA_DIR or ./media)" << std::endl;
   std::cout << std::endl;
   std::cout << "Examples:" << std::endl;
-  std::cout << "  " << prog << " --snapshot ./config_snapshots/demo_2stage_yolo_serial/pipeline.txt --dump-plan-only" << std::endl;
-  std::cout << "  " << prog << " --snapshot ./config_snapshots/demo_2stage_yolo_serial/pipeline.txt --build-only" << std::endl;
-  std::cout << "  " << prog << " --snapshot ./config_snapshots/demo_2stage_yolo_serial/pipeline.txt --run-seconds 20" << std::endl;
+  const char* example_snapshot = "./config_snapshots/ppe_gesture1123/pipeline_ppe_gesture1121.txt";
+  std::cout << "  " << prog << " --snapshot " << example_snapshot << " --dump-plan-only" << std::endl;
+  std::cout << "  " << prog << " --snapshot " << example_snapshot << " --build-only" << std::endl;
+  std::cout << "  " << prog << " --snapshot " << example_snapshot << " --run-seconds 20" << std::endl;
 }
 
 static Args ParseArgs(int argc, char** argv) {
@@ -644,6 +646,11 @@ int main(int argc, char** argv) {
   aibox::detection::CaptureTimestampTracker::SetProcessInstance(&capture_tracker);
 
   // --- Register appsink callbacks ---
+  aibox::pipeline::TerminalContext terminal_context{g_aggregator, {}};
+  for (const auto& stream : plan.stream_plans) {
+    terminal_context.profiles.emplace(std::make_pair(stream.camera_id, stream.assigned_algorithm_group_id),
+                                      stream.algorithm_code);
+  }
   auto& appsinks = build_result.value.registry.appsinks;
   std::cout << "[INFO] Registering " << appsinks.size()
             << " appsink callbacks..." << std::endl;
@@ -656,7 +663,7 @@ int main(int argc, char** argv) {
     g_object_set_data_full(G_OBJECT(entry.appsink), "stage-id",
                            g_strdup(entry.stage_id.c_str()), g_free);
     gst_app_sink_set_callbacks(GST_APP_SINK(entry.appsink), &cbs,
-                               &g_aggregator, nullptr);
+                               &terminal_context, nullptr);
     std::cout << "[INFO]   appsink registered: stage=" << entry.stage_id
               << " (terminal/metamux -> aggregator)" << std::endl;
   }
@@ -759,8 +766,17 @@ int main(int argc, char** argv) {
     aibox::media::GstSnapshotEncoder snapshot_encoder;
     aibox::media::GstThumbnailEncoder thumbnail_encoder;
     aibox::media::NatsMediaReadyTransport media_transport(detection_nats);
+    aibox::media::SnapshotZoneOverlay snapshot_zones(detection_nats);
+    if (!snapshot_zones.Start()) {
+      std::cerr << "[WARN] Could not subscribe to snapshot Zone updates" << std::endl;
+    }
     aibox::media::AnomalySnapshotService snapshot_service(
         snapshot_encoder, thumbnail_encoder, media_writer, media_transport);
+    snapshot_service.SetFrameOverlay(
+        [&snapshot_zones](const std::string& camera_id, std::vector<uint8_t>& packed_nv12,
+                          uint32_t width, uint32_t height) {
+          snapshot_zones.Draw(camera_id, packed_nv12, width, height);
+        });
     aibox::media::AnomalySnapshotService::SetProcessInstance(&snapshot_service);
 
     // 短期帧缓存 + 告警触发的抓拍路径。缓存在服务启动之前
@@ -900,6 +916,7 @@ int main(int argc, char** argv) {
         gst_element_get_state(build_result.value.pipeline, nullptr, nullptr, 10 * GST_SECOND);
         stop_snapshot_services();
         publisher.Stop();
+        snapshot_zones.Stop();
         detection_nats.Disconnect();
         aibox::detection::CaptureTimestampTracker::SetProcessInstance(nullptr);
         PrintBatchRuntimeStats(build_result.value.registry);
@@ -1028,6 +1045,7 @@ int main(int argc, char** argv) {
               << " alarm_dropped=" << snapshot_service.AlarmDropped()
               << std::endl;
     publisher.Stop();
+    snapshot_zones.Stop();
     detection_nats.Disconnect();
 
     // Report what the aggregator collected + what was published.

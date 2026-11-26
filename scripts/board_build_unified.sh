@@ -46,6 +46,16 @@ if [ "${PIPESTATUS[0]}" -ne 0 ]; then
 fi
 [ -x "$AIBOX_ROOT/build_unified/aibox_siglip_worker" ] || { echo MISSING_SIGLIP_WORKER; exit 16; }
 
+echo "== build aibox_siglip_scene =="
+cmake --build "$AIBOX_ROOT/build_unified" -j"$NPROC" --target aibox_siglip_scene \
+  2>&1 | tee "$OUT/make_siglip_scene.log"
+if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+  echo MAKE_SIGLIP_SCENE_FAIL
+  tail -n 40 "$OUT/make_siglip_scene.log"
+  exit 16
+fi
+[ -x "$AIBOX_ROOT/build_unified/aibox_siglip_scene" ] || { echo MISSING_SIGLIP_SCENE; exit 16; }
+
 # Plugins are separate CMake projects (not add_subdirectory of root).
 # FrameMeta ABI unit: common MUST be built before timemux/camsplit/demux.
 STAGING="$AIBOX_ROOT/output/plugin_staging/framemeta_abi"

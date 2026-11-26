@@ -1,0 +1,18 @@
+[scene]
+name=people_gathering
+roi_xyxy=0.4114583333333333,0.25,0.7135416666666666,0.7592592592592593
+prompt_version=people_gathering-refined-007
+
+[positive]
+text=People are standing face to face in the factory aisle.
+input_ids=15565,708,9980,3142,577,3142,575,573,11902,75681,235265,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+[negative]
+text=A few workers are moving along the factory aisle.
+input_ids=235250,2619,8218,708,8096,3731,573,11902,75681,235265,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+[rule]
+activation_threshold_pp=15.0
+recovery_threshold_pp=15.0
+consecutive_samples=3
+cool_down_secs=12

@@ -48,7 +48,7 @@ ctest --test-dir build_unified --output-on-failure
 ctest --test-dir build_unified --output-on-failure -R '^(color8|ppe|stacklight|gesture)_postprocess_test$'
 ```
 
-现役 SigLIP 板端整组入口为 `bash scripts/siglip/run_board_tests.sh`。其 build-review-siglip 输出目录与 `run_isolated.sh`、`check_preprocess.py` 一致；该入口的构建目标已补齐 CTest 所需目标。`scripts/test_frame_cache_config.sh` 仍由 CMake 注册，不属于本次退休脚本。
+现役 SigLIP 板端整组入口为 `bash scripts/siglip/run_board_tests.sh`。其 build-review-siglip 输出目录与 `run_isolated.sh`、`check_preprocess.py` 一致。帧缓存运行策略仍由 `frame_cache_policy_test` 覆盖。
 
 SigLIP 依赖 GStreamer/QTI/QNN、NATS/JetStream、模型及外部参考图。`check_preprocess.py`、`run_isolated.sh` 保留现役入口所用目录约定；缺少参考集或硬件不能把它们记作通过。单元/合成回归通过也不等于真实事件到平台展示的业务链验收通过。
 

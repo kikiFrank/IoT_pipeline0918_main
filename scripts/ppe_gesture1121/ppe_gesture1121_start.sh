@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start the 12-camera ppe_gesture1121 single-model YOLOX TimeMux pipeline.
+# Start the 12-camera YOLOX PPE 1123 TimeMux pipeline.
 set +e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,7 +41,7 @@ if [ -d "$MODULES_DIR" ]; then
 fi
 
 OUT="$R/output/ppe_gesture1121"
-SNAP="$R/config_snapshots/ppe_gesture1121/pipeline_ppe_gesture1121.txt"
+SNAP="$R/config_snapshots/ppe_gesture1123/pipeline_ppe_gesture1121.txt"
 AGG_NEED=12
 LOG="$OUT/ppe_gesture1121_demo.log"
 

@@ -1,0 +1,4 @@
+human
+white_hat
+white_cloth
+gesture

@@ -34,6 +34,7 @@ struct AlarmSnapshotRequest {
   std::string frame_id;
   int64_t occurred_at_ms = 0;
   std::string source_event_id;
+  bool exact_frame = false;
 };
 
 struct SnapshotTask {
@@ -50,6 +51,7 @@ struct SnapshotTask {
   bool alarm_mode = false;
   std::string alarm_id;
   std::string frame_id;
+  bool exact_frame = false;
   int64_t max_delta_ms = 500;
 
   void Release();
@@ -96,6 +98,11 @@ class AnomalySnapshotService {
   /// 告警请求使用的帧来源。不持有所有权。
   void SetFrameCache(FrameSnapshotCache* cache);
 
+  using FrameOverlay = std::function<void(const std::string&, std::vector<uint8_t>&,
+                                          uint32_t, uint32_t)>;
+  // Install before Start(). The callback receives only the snapshot's own copy.
+  void SetFrameOverlay(FrameOverlay overlay);
+
   bool WaitUntilIdle(int timeout_ms);
 
   uint64_t Enqueued() const;
@@ -134,7 +141,8 @@ class AnomalySnapshotService {
   void ProcessAlarmTask(SnapshotTask task);
   /// 只编码一次，写出 JPEG 和（尽力而为的）缩略图。检测路径与
   /// 告警路径共用此方法，避免计数器和命名出现偏差。
-  SnapshotArtifacts EncodeWriteAndThumbnail(const std::vector<uint8_t>& packed,
+  SnapshotArtifacts EncodeWriteAndThumbnail(const std::string& camera_id,
+                                            std::vector<uint8_t>& packed,
                                             uint32_t width, uint32_t height,
                                             const std::string& asset_id);
   void DropOldestLocked();
@@ -163,6 +171,7 @@ class AnomalySnapshotService {
   bool busy_ = false;
 
   FrameSnapshotCache* frame_cache_ = nullptr;
+  FrameOverlay frame_overlay_;
   std::function<void(const std::string&, const std::string&)> failure_sink_;
 
   struct EncodedAsset {

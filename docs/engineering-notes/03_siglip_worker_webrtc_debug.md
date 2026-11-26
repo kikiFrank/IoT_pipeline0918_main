@@ -2,17 +2,18 @@
 
 > 本仓库历史资料来自 2026-10-28/29 的 SigLIP2 Worker Runbook / Model Notes 和 2026-11 的故障记录，原文已在整理后删除，运行说明已迁入本文；旧 WebRTC/Face/Weston 部分来自旧仓库 2026-08/09。**新 Worker 与旧 Face Worker 不是同一套实现**。
 
+本文的告警图片 Worker Runbook 使用 `aibox_siglip_worker`。当前实时场景使用 `aibox_siglip_scene`，统一启动入口、同一 HTP 的编码顺序及分数契约分别见 [运行生命周期](../architecture/runtime_lifecycle.md) 和 [数据契约](../architecture/data_contracts.md)。
+
 ## 1. SigLIP2 Worker 当前的真实职责与运行边界
 
 业务入口：`event.datamgr.alarm_ready`，使用专属 durable `siglip-worker-alarm-ready-v1`；通过只读 `alarm.list` 获取业务时间/相机，通过 `media.get_meta` 获取原始 JPEG；对**每个 alarm_id** 写出 768 维向量，本地输出 `output/siglip_worker/outbox/`，失败另写 `failures/`。
 
-当前部署入口：
+告警图片 Worker 的独立启停：
 
 ```bash
 # 在实际运行根目录（AIBOX_ROOT）下执行；先确认端口/设备资源、当前运行状态
-bash scripts/start_all.sh        # CNN + SigLIP2 Worker
-bash scripts/siglip/siglip_start.sh  # 仅 Worker
-bash scripts/webrtc_stop.sh      # 统一停止
+bash scripts/siglip/siglip_start.sh
+bash scripts/siglip/siglip_stop.sh
 ```
 
 **就绪状态不可混淆**：`SIGLIP_READY state=PLAYING consumer=READY model=AWAITING_FIRST_INFERENCE` 只证明 Pipeline 及 Consumer 已连接；第一次真实任务推理成功才标 `SIGLIP_FIRST_INFERENCE_OK`。标注 RTSP 服务失败时，应保留 `ANNOTATED_RTSP_DEGRADED` 并阻止虚假 `PIPELINE_READY`。
@@ -105,7 +106,7 @@ bash scripts/webrtc_stop.sh      # 统一停止
 - 当前保留的测试入口：[SigLIP 板端测试](../../scripts/siglip/run_board_tests.sh)、[Worker 核心测试](../../tests/siglip_worker/core_test.cpp)、[隔离测试](../../tests/siglip_worker/run_isolated.sh)；完整清单见 [测试索引](../../tests/README.md)。
 - 旧仓库历史来源（非本仓库当前路径）：`IoT_pipeline_0918` `486d0c3` 的 `test/face_accept/results/*`、`test/face_async/*`、`scripts/*weston*`。
 
-## 7. SigLIP2 Worker 现役运维 Runbook（由原 `SigLIP2_Worker_Runbook.md` 迁入）
+## 7. 告警图片 Worker 运维与历史部署记录
 
 ### 7.1 部署路径与启动入口
 
@@ -115,14 +116,9 @@ bash scripts/webrtc_stop.sh      # 统一停止
 - 源码构建目录：`/mnt/workspace/1028pipeline_fix_and_service_embed_test/ai-box_stream_pipeline`
 - SSH：`ssh ubuntu@192.168.50.165`
 
-组合启动 CNN + SigLIP2 Worker：
+原组合入口 `scripts/start_all.sh` 仅保留在简化前的提交中。其日志成功标记依次为 CNN `BOOT_OK`、`AGG_OK`，Worker `SIGLIP_START_OK`，以及组合入口的 `START_ALL_OK`。当前统一 RTSP 入口与独立告警图片 Worker 命令见运行生命周期和本篇第 1 节。[统一启停](../architecture/runtime_lifecycle.md#2-统一-rtsp-启停) · [原组合入口](https://github.com/kikiFrank/IoT_pipeline0918_main/blob/5e40fe10b2d3057f59f3b40e2403f7e6680cfee3/scripts/start_all.sh)
 
-```bash
-cd /mnt/workspace/0924/aibox_pipeline
-bash scripts/start_all.sh
-```
-
-成功状态必须按顺序核对：CNN `BOOT_OK`、`AGG_OK`，Worker `SIGLIP_START_OK`，总入口 `START_ALL_OK`。Worker 日志中的
+告警图片 Worker 日志中的
 
 ```text
 [SIGLIP_READY] state=PLAYING consumer=READY model=AWAITING_FIRST_INFERENCE
@@ -134,24 +130,9 @@ bash scripts/start_all.sh
 
 ### 7.2 停止入口与失败语义
 
-统一停止 CNN + Worker：
+历史组合停止成功时会输出 `SIGLIP_STOP_OK`、CNN `NULL_LOG=clean`、`STOPPED_CLEAN` 和 `STOP_ALL_OK`。当前统一 RTSP 由 `bash scripts/start_all/stop_rtsp.sh` 停止，独立告警图片 Worker 由 `bash scripts/siglip/siglip_stop.sh` 停止。控制锁忙、PID 身份不明或停止超时时，应先核对对应日志。
 
-```bash
-cd /mnt/workspace/0924/aibox_pipeline
-bash scripts/webrtc_stop.sh
-```
-
-成功时核对 `SIGLIP_STOP_OK`、CNN `NULL_LOG=clean`、`STOPPED_CLEAN` 和 `STOP_ALL_OK`。即使 CNN 已退出，wrapper 仍会先处理 Worker。控制锁忙、PID 身份不明或停止超时都应非零退出；先检查对应日志，不要直接按 PID 猜测并 kill。
-
-独立入口（仅在需要单独控制时使用）：
-
-```bash
-bash scripts/yolo26/webrtc_start12.sh
-bash scripts/siglip/siglip_start.sh
-bash scripts/siglip/siglip_stop.sh
-```
-
-`start_all.sh` 会先准备专属 durable，再启动 CNN 和 Worker。首次创建 durable 使用 DeliverNew；后续绑定已有 consumer，以保留停机期间积压。Worker 启动失败时，总启动返回码为 22，已正常运行的 CNN 保持运行。
+原组合入口先准备专属 durable，再启动 CNN 和 Worker。首次创建 durable 使用 DeliverNew，后续绑定已有 consumer 以保留停机期间积压。该历史入口在 Worker 启动失败时返回 22，已运行的 CNN 继续运行。
 
 ### 7.3 生产配置、模型身份与消息契约
 

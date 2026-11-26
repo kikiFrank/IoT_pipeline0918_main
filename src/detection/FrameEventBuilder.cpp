@@ -27,6 +27,8 @@ constexpr uint32_t kSchemaVersion = 2;
   frame.set_schema_version(kSchemaVersion);
   frame.set_coordinate_space(::aibox::CoordinateSpace::NORMALIZED);
   frame.set_algorithm_code(result.algorithm_group_id);
+  frame.set_source_profile_code(result.source_profile_code);
+  frame.set_snapshot_cached(result.snapshot_cached);
   frame.set_frame_width(result.frame_width);
   frame.set_frame_height(result.frame_height);
   if (result.frame_id != 0) {

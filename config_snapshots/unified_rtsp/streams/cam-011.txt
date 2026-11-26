@@ -1,0 +1,10 @@
+[stream]
+camera_id=cam-011
+name=cam-011
+enabled=1
+source_type=rtsp
+rtsp_url=rtsp://192.168.50.140:8556/cam-048
+encoding=h264
+
+[inference]
+scenes=workstation_organization

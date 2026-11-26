@@ -1,0 +1,5 @@
+# Encoder paths are relative to the project root.
+
+[model]
+image_encoder=data/models/siglip2/image_encoder.bin
+text_encoder=data/models/siglip2/text_encoder.bin

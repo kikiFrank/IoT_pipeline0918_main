@@ -9,5 +9,7 @@ struct Embedding {
   double raw_l2_norm = 0;
   std::uint64_t pts_ns = 0;
 };
-Embedding ParseEmbedding(const char* data, std::size_t size, std::uint64_t expected_pts);
+enum class EmbeddingKind { Image, Text };
+Embedding ParseEmbedding(const char* data, std::size_t size, std::uint64_t expected_pts,
+                         EmbeddingKind kind = EmbeddingKind::Image);
 }  // namespace aibox::siglip

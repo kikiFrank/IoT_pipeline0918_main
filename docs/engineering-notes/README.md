@@ -7,8 +7,9 @@
 | `01_models_preprocess_qnn.md` | PPE/Andon/Raisehands/1stage Andon 模型契约、GLES/ROI/NMS/量化、QNN 与模型替换经验 |
 | `02_rtsp_codec_multistream_vpu.md` | H.264/H.265、TCP/UDP、颜色 caps、12/16 路 VPU 与延迟实验 |
 | `03_siglip_worker_webrtc_debug.md` | SigLIP2 Worker 运行/停止 Runbook、预处理实测、幂等与 ACK、WebRTC/RTSP 冻结、GPU/Weston 排障 |
-| `04_events_nats_media_andon.md` | 事件契约、逐事件图片可追溯、灯色与 Raisehands 检测、Andon 业务时序 |
+| [04 · 事件、媒体与 Andon](04_events_nats_media_andon.md) | 事件契约、逐事件图片可追溯、Events 截图 Zone 热更新、灯色和手势业务时序 |
 | `05_validation_failures_and_checklists.md` | 已验收实验边界、已知失败/未闭环状态、回归矩阵和检查清单 |
+| [06 · Face 复接手册](06_face_unified_pipeline_reintegration.md) | Face 的代码、插件、模型和配置依赖，以及接回统一 Pipeline 的步骤 |
 
 ## 原始 docs 的处理
 
