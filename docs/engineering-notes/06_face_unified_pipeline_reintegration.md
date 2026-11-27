@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-- [统一配置](../../config/unified_rtsp.json) 由 [统一 supervisor](../../tools/rtsp_supervisor.py) 读取，启动时生成 CNN 的 TXT 配置和各 SigLIP2 场景的 JSON。当前统一配置未启用 Face，也没有生成 SCRFD 模型 include 的逻辑。仅在统一 JSON 增加 `[face]` 对应的设置无法启用完整链路。
+- [统一配置](../../config_snapshots/unified_rtsp/pipeline_unified_rtsp.txt) 由 [统一 supervisor](../../tools/rtsp_supervisor.py) 读取，启动时生成 CNN 的 TXT 配置和各 SigLIP2 场景的 JSON。重新接入 Face 需要在配置加载和渲染时传递 `[face]` 及 SCRFD 模型引用，并接通下文的构图和运行入口。
 - 旧 Face Demo 同时使用 YOLO26 和 SCRFD，完整目录可以在备份提交 `5e40fe1` 查阅。当前保留的 SCRFD BIN 可以独立用于未来复接 PPE 或 Light。
 - 当前 SCRFD 功能是人脸检测和白色遮罩。ArcFace 源码随插件编译，现有 `arcface_model` 为空。Face 元数据供 GStreamer 内部绘制使用，现有检测事件和 Rule Engine 可以沿用既有接口。
 

@@ -3,7 +3,7 @@ camera_id=cam-012
 name=cam-012
 enabled=1
 source_type=rtsp
-rtsp_url=rtsp://192.168.50.140:8556/cam-049
+rtsp_url=rtsp://192.168.50.140:8556/cam-016
 encoding=h264
 
 [inference]

@@ -2,13 +2,22 @@
 # Board-only test. Uses a temporary JetStream server and mock RPC subjects.
 set -euo pipefail
 S="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-T="$S/output/siglip_worker/isolated_test_$(date +%Y%m%d_%H%M%S)_$$"
-R="${AIBOX_ROOT:-/mnt/workspace/0924/aibox_pipeline}"
-BIN="$S/build-review-siglip/aibox_siglip_worker"
-HARNESS="$S/build-review-siglip/siglip_isolated_harness"
-URL="nats://127.0.0.1:45223"
+JPEG="${1:?usage: test_jetstream_redelivery.sh sample.jpg [build-directory]}"
+BUILD="${2:-$S/build-review-siglip}"
+R="${AIBOX_ROOT:-$S}"
+BIN="$BUILD/aibox_siglip_worker"
+HARNESS="$BUILD/siglip_isolated_harness"
+PORT="${SIGLIP_TEST_NATS_PORT:-45223}"
+URL="nats://127.0.0.1:$PORT"
+[[ -r "$JPEG" && -x "$BIN" && -x "$HARNESS" ]] || {
+  echo "Readable JPEG and built worker/harness required" >&2
+  exit 2
+}
+OUT="$S/output/siglip_worker"
+mkdir -p "$OUT"
+T="$(mktemp -d "$OUT/isolated_test.XXXXXX")"
 mkdir -p "$T/media" "$T/outbox" "$T/failures" "$T/logs"
-cp "${SIGLIP_TEST_JPEG:-/mnt/workspace/1027siglips/data/images/000000161978.jpg}" "$T/media/test.jpg"
+cp -- "$JPEG" "$T/media/test.jpg"
 server_pid=""; mock_pid=""; worker_pid=""
 cleanup() {
   for pid in "$worker_pid" "$mock_pid" "$server_pid"; do
@@ -19,42 +28,52 @@ cleanup() {
   done
 }
 trap cleanup EXIT
-nats-server -js -a 127.0.0.1 -p 45223 -sd "$T/nats-store" >"$T/nats.log" 2>&1 & server_pid=$!
+nats-server -js -a 127.0.0.1 -p "$PORT" -sd "$T/nats-store" >"$T/nats.log" 2>&1 & server_pid=$!
+ready=0
 for ((i=0;i<30;i++)); do
-  if "$HARNESS" setup "$URL" >/dev/null 2>&1; then break; fi
+  kill -0 "$server_pid" 2>/dev/null || { cat "$T/nats.log" >&2; exit 1; }
+  if grep -Fq 'Server is ready' "$T/nats.log" && "$HARNESS" setup "$URL" >/dev/null 2>&1; then
+    ready=1
+    break
+  fi
   sleep 1
 done
+[[ "$ready" == 1 ]]
 "$HARNESS" mock "$URL" "$T/media/test.jpg" >"$T/mock.log" 2>&1 & mock_pid=$!
 for ((i=0;i<30;i++)); do
   if grep -Fq MOCK_READY "$T/mock.log"; then break; fi
   sleep 1
 done
 grep -Fq MOCK_READY "$T/mock.log"
-python3 - "$S" "$T" <<'PY'
+python3 - "$S" "$T" "$URL" <<'PY'
 import pathlib, sys
-s, t = map(pathlib.Path, sys.argv[1:])
-cfg = (s / 'config_snapshots/siglip_worker/worker.txt').read_text()
+s, t = map(pathlib.Path, sys.argv[1:3])
+cfg = (s / 'config_snapshots/siglip_worker/worker.txt').read_text(encoding='utf-8')
 changes = {
-    'nats://127.0.0.1:4222': 'nats://127.0.0.1:45223',
-    'stream=ALARM_READY_PIPELINE': 'stream=ALARM_READY_SIGLIP_ISOLATED',
-    'subject=event.datamgr.alarm_ready': 'subject=test.siglip.ready',
-    'durable=siglip-worker-alarm-ready-v1': 'durable=siglip-worker-isolated',
-    'media_meta_rpc=rpc.datamgr.media.get_meta': 'media_meta_rpc=test.siglip.rpc.media',
-    'alarm_list_rpc=rpc.datamgr.alarm.list': 'alarm_list_rpc=test.siglip.rpc.alarm',
-    'ack_wait_ms=120000': 'ack_wait_ms=10000',
-    'in_progress_interval_ms=30000': 'in_progress_interval_ms=2000',
-    'max_file_wait_ms=30000': 'max_file_wait_ms=1000',
-    'infer_timeout_ms=30000': 'infer_timeout_ms=1000',
-    'model_path=../../data/models/siglip2/image_encoder.bin': f'model_path={s}/data/models/siglip2/image_encoder.bin',
-    'allowed_media_root=/mnt/workspace/0924/aibox_pipeline/media': f'allowed_media_root={t}/media',
-    'outbox_dir=../../output/siglip_worker/outbox': f'outbox_dir={t}/outbox',
-    'failure_dir=../../output/siglip_worker/failures': f'failure_dir={t}/failures',
-    'log_dir=../../output/siglip_worker': f'log_dir={t}/logs',
+    'url': sys.argv[3],
+    'stream': 'ALARM_READY_SIGLIP_ISOLATED',
+    'subject': 'test.siglip.ready',
+    'durable': 'siglip-worker-isolated',
+    'media_meta_rpc': 'test.siglip.rpc.media',
+    'alarm_list_rpc': 'test.siglip.rpc.alarm',
+    'ack_wait_ms': '10000',
+    'in_progress_interval_ms': '2000',
+    'max_file_wait_ms': '1000',
+    'infer_timeout_ms': '1000',
+    'model_path': str(s / 'data/models/siglip2/image_encoder.bin'),
+    'htp_device_id': str(int(pathlib.Path('/dev/fastrpc-cdsp1').exists())),
+    'allowed_media_root': str(t / 'media'),
+    'outbox_dir': str(t / 'outbox'),
+    'failure_dir': str(t / 'failures'),
+    'log_dir': str(t / 'logs'),
 }
-for old, new in changes.items():
-    if old not in cfg: raise SystemExit(f'missing test config key: {old}')
-    cfg = cfg.replace(old, new)
-(t / 'worker_test.txt').write_text(cfg)
+lines = []
+for line in cfg.splitlines():
+    key, sep, _ = line.partition('=')
+    lines.append(f'{key}={changes.pop(key)}' if sep and key in changes else line)
+if changes:
+    raise SystemExit(f'missing test config keys: {sorted(changes)}')
+(t / 'worker_test.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
 PY
 export AIBOX_ROOT="$R"
 # shellcheck disable=SC1091
@@ -91,7 +110,7 @@ grep -Fq '[SIGLIP_SHUTDOWN_OK] state=NULL' "$T/worker_recovery.log"
 "$HARNESS" status "$URL" | tee "$T/status.log"
 grep -Fq 'ACK_FLOOR=1' "$T/status.log"
 # Publish while stopped: durable must retain a new alarm sharing the same JPEG.
-cp "${SIGLIP_TEST_JPEG:-/mnt/workspace/1027siglips/data/images/000000161978.jpg}" "$T/media/test.jpg"
+cp -- "$JPEG" "$T/media/test.jpg"
 "$HARNESS" publish "$URL" test-alarm-2
 "$HARNESS" status "$URL" | tee "$T/stopped_status.log"
 grep -Fq 'PENDING=1' "$T/stopped_status.log"
@@ -129,7 +148,7 @@ wait "$worker_pid"; worker_pid=""
 "$HARNESS" status "$URL" | tee "$T/final_status.log"
 grep -Fq 'ACK_FLOOR=4' "$T/final_status.log"
 python3 - "$T" <<'PY'
-import json, pathlib, sys
+import hashlib, json, pathlib, sys
 t = pathlib.Path(sys.argv[1]); files = list((t/'outbox').glob('*.json'))
 assert len(files) == 3
 records = [json.loads(f.read_text()) for f in files]
@@ -137,7 +156,8 @@ o = next(r for r in records if r['alarm_id'] == 'test-alarm')
 assert o['alarm_id'] == 'test-alarm' and o['event_id'] == 'test-asset'
 assert o['source_event_id'] == 'source-test' and o['camera_id'] == 'cam-test'
 assert o['event_timestamp_ms'] == 1793180000000
-assert len(o['embedding']) == 768 and o['image_sha256'] == 'e63efa78dc3ef4bc5490566bfac5a21b3669e1ec12f3dc700462cd6c196d46ef'
+assert len(o['embedding']) == 768
+assert o['image_sha256'] == hashlib.sha256((t/'media/test.jpg').read_bytes()).hexdigest()
 assert len({r['image_sha256'] for r in records}) == 1
 failures = [json.loads(f.read_text()) for f in (t/'failures').glob('*.json')]
 assert len(failures) == 1 and failures[0]['stage'] == 'PARSE_READY'

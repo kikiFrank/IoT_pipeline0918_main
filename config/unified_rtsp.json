@@ -27,7 +27,7 @@
         "group_caps": "video/x-raw,format=NV12,width=1920,height=1080,interlace-mode=progressive",
         "enabled": "1",
         "plugin": "aiboxtimemux",
-        "max_group_size": "6",
+        "max_group_size": "4",
         "wait_timeout_ms": "200",
         "drop_policy": "latest",
         "pad_mode": "request",
@@ -47,6 +47,7 @@
     },
     "profiles": {
       "ppe": {
+        "then": "light",
         "algorithm": {
           "algorithm": {
             "code": "ppe_gesture1121",
@@ -58,7 +59,7 @@
           "grouping": {
             "group_by": "algorithm_signature",
             "time_mux_enabled": "1",
-            "max_mux_group_size": "6",
+            "max_mux_group_size": "4",
             "batch": "1"
           },
           "stage.1": {
@@ -153,7 +154,7 @@
           "grouping": {
             "group_by": "algorithm_signature",
             "time_mux_enabled": "1",
-            "max_mux_group_size": "6",
+            "max_mux_group_size": "4",
             "batch": "1"
           },
           "stage.1": {
@@ -403,6 +404,7 @@
       "cnn": "light"
     },
     "cam-007": {
+      "cnn": "light",
       "source": "rtsp://192.168.50.140:8556/cam-021",
       "scenes": [
         "aisle_cart_obstruction",
@@ -414,18 +416,21 @@
       "cnn": "ppe"
     },
     "cam-009": {
+      "cnn": "light",
       "source": "rtsp://192.168.50.140:8556/cam-027",
       "scenes": [
         "people_gathering"
       ]
     },
     "cam-010": {
+      "cnn": "light",
       "source": "rtsp://192.168.50.140:8556/cam-041",
       "scenes": [
         "material_obstruction"
       ]
     },
     "cam-011": {
+      "cnn": "light",
       "source": "rtsp://192.168.50.140:8556/cam-048",
       "scenes": [
         "workstation_organization"

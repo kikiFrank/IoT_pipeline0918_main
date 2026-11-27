@@ -45,10 +45,10 @@
 |---|---|---|
 | C1 `verified`：插件默认值内部不一致 | [timemux cpp](../../plugins/aiboxtimemux/gstaiboxtimemux.cpp) 第 127 行的 GParamSpec 默认 16，init 约第 195 行为 4；[demux cpp](../../plugins/aiboxstreamdemux/gstaiboxstreamdemux.cpp) 第 113/149 行同样 16/4。Builder 显式设置容量，不能由该差异直接推出当前样例运行错误 | 后续统一为 4 还是 16？同时明确未显式配置的独立插件用法 |
 | C2 `verified`：timemux header 注释滞后 | [header](../../plugins/aiboxtimemux/gstaiboxtimemux.hpp) 约第 98 行仍称 Monotonic allocator，实际实现见 D1 | 是否后续只修正注释？不应为了匹配注释改变当前 slot 算法 |
-| C3 `verified`：CNN PID 管理没有全程精确身份校验 | [start common](../../scripts/webrtc_start_common.sh) 第 67–71 行 pgrep/pkill -f，约第 108 行按短进程名取首个；[CNN stop](../../scripts/yolo_x_stacklight_stop.sh) 第 67 行宽匹配 TERM，force 时第 80–81 行 fuser -k。Worker 则有 executable/starttime/config 身份检查 | 是否接受当前单实例假设？若需多副本/并行测试，应另立修复任务设计 CNN 身份与作用域 |
+| C3 | 独立 CNN 的启停已改为记录并核验实际子进程身份。启动时仍检查是否已有 CNN 占用，避免同板冲突。[公共运行脚本](../../scripts/webrtc_start_common.sh) | 已替换原按进程名广泛发送 TERM 的路径。 |
 | C4 `verified`：并非所有启动失败都会清理新进程 | start common 的 BOOT_GFX_ERROR/BOOT_TIMEOUT 约第 129/133 行直接退出；AGG_TIMEOUT 约第 148 行才有 TERM+等待处理 | 是否要求所有启动失败路径统一清理已启动进程？板端需验证退出后是否残留，当前只确认代码分支差异 |
 | C5 `verified`：READY_FOR_BROWSER 不代表浏览器链验收 | start common 约第 138–142 行按 AGG **总行数** 达阈值后输出标记，并非每路唯一相机覆盖，也没有 HTML/8080 服务 | 后续发布门禁是否应要求每相机进展及客户端实际取流？当前文档不提升该标记含义 |
-| C6 `verified`：运行脚本可能恢复图形/VPU | start common 第 60 行附近默认 if-needed、无 Weston 时 auto-start；[vpu_health](../../scripts/vpu_health.sh) 可 sudo 调 reset_vpu；CNN stop 进程退出后亦会检查并恢复。只有 build 脚本声明不重置 | 这是当前操作策略，是否继续保留需由现场维护要求决定；不能把启动/停止解释成无设备副作用 |
+| C6 `verified`：运行脚本可能恢复图形/VPU | start common 第 60 行附近默认 if-needed、无 Weston 时 auto-start；[vpu_health](../../scripts/vpu_health.sh) 可 sudo 调 reset_vpu。只有 build 脚本声明不重置 | 这是当前操作策略，是否继续保留需由现场维护要求决定；不能把启动/停止解释成无设备副作用 |
 | C7 `verified`：ABI quartet 的切换不是多文件原子事务 | [board_build_unified.sh](../../scripts/board_build_unified.sh) 第 125 行打印 atomic switch，第 126–129 行实际逐个 cp 四个 .so；staging/摘要并不提供事务原子性 | 若需允许在线构建/部署，是否另行设计停机或版本目录切换？本次仅修正文档描述 |
 | C8 `needs-confirmation`：历史 PPE 输出 dtype 资料不一致 | 旧配置声明 `output.dtype=uint16`，同期工程笔记记录 QNN 下游 FLOAT32 `[1,8400,8]`。[历史 PPE descriptor](https://github.com/kikiFrank/IoT_pipeline0918_main/blob/5e40fe10b2d3057f59f3b40e2403f7e6680cfee3/config_snapshots/ppe_4cam/models/yolox_ppe_w8a16.txt) · [历史工程记录](../engineering-notes/01_models_preprocess_qnn.md) | 按待核实的模型 BIN、SDK、插件与配置采集真实 Tensor dtype、shape 和量化参数，并记录具体的输出边界。 |
 

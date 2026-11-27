@@ -164,6 +164,13 @@ int RunChecks(aibox::adapter::NatsAdapter& client,
 }  // namespace
 
 int main(int argc, char** argv) {
+  const char* url_env = std::getenv("AIBOX_TEST_NATS_URL");
+  if (url_env == nullptr || url_env[0] == '\0') {
+    std::cout << "SKIP: set AIBOX_TEST_NATS_URL to an isolated test server" << std::endl;
+    return 0;
+  }
+  const std::string nats_url = url_env;
+
   gst_init(&argc, &argv);
 
   GstElement* pipeline = BuildDummyPipeline();
@@ -172,11 +179,6 @@ int main(int argc, char** argv) {
               << std::endl;
     return 1;
   }
-
-  const char* url_env = std::getenv("AIBOX_TEST_NATS_URL");
-  const std::string nats_url =
-      (url_env != nullptr && url_env[0] != '\0') ? url_env
-                                                 : "nats://127.0.0.1:4222";
 
   int rc = 0;
   {

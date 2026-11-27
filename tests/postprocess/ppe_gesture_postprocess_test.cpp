@@ -1,4 +1,4 @@
-// Compile as one translation unit, like the existing YOLOX module tests.
+// Compile the PPE postprocessing module and its test as one translation unit.
 #include "../../plugins/mlpostprocess_roi/modules/object-detection/ml-postprocess-yolox-ppe.cc"
 
 #include <stdexcept>

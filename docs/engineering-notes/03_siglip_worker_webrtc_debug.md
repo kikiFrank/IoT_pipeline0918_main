@@ -42,7 +42,7 @@ bash scripts/siglip/siglip_stop.sh
 
 ### 当前保留的测试依赖
 
-`CMakeLists.txt` 用 `BUILD_TESTING=ON` 编译 `tests/siglip_worker/{core_test.cpp,isolated_harness.cpp,preprocess_probe.cpp,hardware_benchmark.cpp}`；`scripts/siglip/run_board_tests.sh` 又调用 `tests/siglip_worker/check_preprocess.py` 和 `run_isolated.sh`。这 6 个文件均已保留，现存路径、用途和运行方法见 [测试索引](../../tests/README.md)。
+开启 `BUILD_TESTING=ON` 构建 Worker 核心测试、预处理探针、JetStream 支撑程序和硬件 benchmark。板端入口接收参考数据集及 JPEG。文件名、目标与运行方法见 [测试索引](../../tests/README.md)。
 
 ## 4. 旧 WebRTC Face 6 路失败：对照而不是杜撰根因
 
@@ -103,7 +103,7 @@ bash scripts/siglip/siglip_stop.sh
 
 - 历史来源（整理前文件，已删除）：`docs/SigLIP2_Worker_Runbook.md`、`docs/SigLIP2_Model_Notes.md`，可在本仓库 `b993627` 查阅；运行与测试说明已迁入本文第 7 节。
 - 历史脚本（已退役，方法已归档）：原 `tests/{pipeline_runtime_acceptance.py,controlled_rtsp_disconnect.py,diagnose_rtsp_stall.py,gst_rootcause_trace.cpp}`，见 [实验逻辑归档](../../tests/EXPERIMENTS_ARCHIVE.md)。
-- 当前保留的测试入口：[SigLIP 板端测试](../../scripts/siglip/run_board_tests.sh)、[Worker 核心测试](../../tests/siglip_worker/core_test.cpp)、[隔离测试](../../tests/siglip_worker/run_isolated.sh)；完整清单见 [测试索引](../../tests/README.md)。
+- 当前保留的测试入口：[SigLIP 板端测试](../../scripts/siglip/run_board_tests.sh)、[Worker 核心测试](../../tests/siglip_worker/embedding_outbox_test.cpp)、[隔离测试](../../tests/siglip_worker/test_jetstream_redelivery.sh)；完整清单见 [测试索引](../../tests/README.md)。
 - 旧仓库历史来源（非本仓库当前路径）：`IoT_pipeline_0918` `486d0c3` 的 `test/face_accept/results/*`、`test/face_async/*`、`scripts/*weston*`。
 
 ## 7. 告警图片 Worker 运维与历史部署记录

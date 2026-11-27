@@ -28,6 +28,7 @@ struct GstPipelineBuildOptions {
   // the annotated H.264 over the in-process RTSP server (AnnotatedRtspServer).
   // When false (default) the builder topology is byte-identical to legacy.
   bool enable_annotated_rtsp = false;
+  std::unordered_map<CameraId, std::string> scene_frame_sockets;
 };
 
 struct GstPipelineBuildResult {

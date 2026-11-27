@@ -13,7 +13,7 @@
 
 ## 当前运行入口
 
-主工作区使用 `scripts/start_all/start_rtsp.sh` 和 `scripts/start_all/stop_rtsp.sh` 管理 12 路。默认读取 `config/unified_rtsp.json`。进程、拓扑和跨服务契约见架构文档，既有板端记录见验收索引。[运行生命周期](architecture/runtime_lifecycle.md) · [系统总览](architecture/system_overview.md) · [板端验收](validation/README.md)
+主工作区使用 `scripts/start_all/start_rtsp.sh` 和 `scripts/start_all/stop_rtsp.sh` 管理 12 路。默认读取 `config_snapshots/unified_rtsp/pipeline_unified_rtsp.txt` 及其相机、算法、模型、标签和场景文件。进程、拓扑和跨服务契约见架构文档，既有板端记录见验收索引。[运行生命周期](architecture/runtime_lifecycle.md) · [系统总览](architecture/system_overview.md) · [板端验收](validation/README.md)
 
 2026-11-08 的草稿迁入记录和当时待核对项见 [历史审核报告](architecture/REVIEW.md)。
 

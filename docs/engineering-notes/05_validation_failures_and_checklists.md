@@ -74,9 +74,9 @@ assert 'ANDON_BINDING_ERROR' not in runtime_log
 assert stopped_cleanly and iris_refcnt == 0
 ```
 
-当前保留的 [PPE/Stacklight 测试](../../tests/ppe/test_yolox_ppe_postprocess.cpp) 和 [图片服务测试](../../tests/unit/snapshot_service_test.cpp) 直接固定算法与代码契约，可以随着源码变更持续运行：只写一段 Markdown **不能替代回归**。
+当前保留的 [PPE／Gesture 和 Light 测试](../../tests/postprocess/) 和 [图片服务测试](../../tests/unit/snapshot_service_test.cpp) 直接固定算法与代码契约，可以随着源码变更持续运行：只写一段 Markdown **不能替代回归**。
 
-## 6. 清理后的验证与后续维护
+## 6. 上一轮清理的验证记录与后续维护
 
 - CMake 已使用 `tests/unit/` 的新路径；保留算法测试已接入 CTest，`scripts/siglip/run_board_tests.sh` 已补齐对应构建目标。
 - 清理时实际运行通过八类 Andon、PPE、Stacklight、帧缓存四项测试，并检查了保留 Python 的语法和测试文件路径；完整板端 CTest、手势及 SigLIP 硬件测试未在该次整理环境执行。不要把文件整理完成写成全部硬件验收通过。

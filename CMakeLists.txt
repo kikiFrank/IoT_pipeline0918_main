@@ -169,13 +169,13 @@ if(QTI_SOURCE_ROOT)
 endif()
 if(BUILD_TESTING)
     target_compile_definitions(aibox_siglip_worker PRIVATE SIGLIP_TEST_HOOKS=1)
-    add_executable(siglip_preprocess_probe tests/siglip_worker/preprocess_probe.cpp)
+    add_executable(siglip_preprocess_probe tests/siglip_worker/prepare_image_probe.cpp)
     target_link_libraries(siglip_preprocess_probe PRIVATE aibox_siglip_core)
-    add_executable(siglip_isolated_harness tests/siglip_worker/isolated_harness.cpp)
+    add_executable(siglip_isolated_harness tests/siglip_worker/nats_worker_test_harness.cpp)
     target_include_directories(siglip_isolated_harness PRIVATE ${NATS_INCLUDE_DIRS})
     target_link_libraries(siglip_isolated_harness PRIVATE aibox_siglip_core ${NATS_LIBRARIES})
     add_executable(siglip_hardware_benchmark
-        tests/siglip_worker/hardware_benchmark.cpp
+        tests/siglip_worker/benchmark_image_encoder.cpp
         src/siglip_worker/SiglipPipelineBuilder.cpp
         src/pipeline/GstElementHelper.cpp)
     target_include_directories(siglip_hardware_benchmark PRIVATE ${GST_INCLUDE_DIRS} ${GST_APP_INCLUDE_DIRS})
@@ -198,7 +198,7 @@ if(BUILD_TESTING)
     target_link_libraries(snapshot_service_test PRIVATE
         aibox_frame_cache ${GST_LIBRARIES} ${GST_VIDEO_LIBRARIES} Threads::Threads)
     add_test(NAME snapshot_service_test COMMAND snapshot_service_test)
-    add_executable(siglip_worker_core_test tests/siglip_worker/core_test.cpp)
+    add_executable(siglip_worker_core_test tests/siglip_worker/embedding_outbox_test.cpp)
     target_link_libraries(siglip_worker_core_test PRIVATE aibox_siglip_core)
     add_test(NAME siglip_worker_core_test COMMAND siglip_worker_core_test)
 endif()
@@ -218,42 +218,23 @@ if(BUILD_TESTING)
     target_link_libraries(pipeline_control_test PRIVATE
         ${GST_LIBRARIES} ${NATS_LIBRARIES} imsdk_proto Threads::Threads)
     add_test(NAME pipeline_control_test COMMAND pipeline_control_test)
+    set_tests_properties(pipeline_control_test PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP:")
 endif()
 
 # --- deterministic model postprocess regression tests ---
 if(BUILD_TESTING)
-    add_executable(color8_postprocess_test tests/1stage_andon/test_color8_postprocess.cpp)
-    target_compile_definitions(color8_postprocess_test PRIVATE AIBOX_YOLOX_COLOR8=1)
-    add_executable(ppe_postprocess_test tests/ppe/test_yolox_ppe_postprocess.cpp)
-    add_executable(stacklight_postprocess_test tests/ppe/test_yolox_ppe_postprocess.cpp)
-    target_compile_definitions(stacklight_postprocess_test PRIVATE AIBOX_YOLOX_STACKLIGHT=1)
-    add_executable(ppe_gesture1121_postprocess_test tests/ppe/test_yolox_ppe_gesture1121.cpp)
-    target_compile_definitions(ppe_gesture1121_postprocess_test PRIVATE AIBOX_YOLOX_PPE_GESTURE1121=1)
-    add_executable(gesture_postprocess_test
-        tests/raisehands/test_gesture.cpp src/pipeline/GstElementHelper.cpp)
-    foreach(test_target color8_postprocess_test ppe_postprocess_test
-                        stacklight_postprocess_test gesture_postprocess_test
-                        ppe_gesture1121_postprocess_test)
+    add_executable(ppe_gesture_postprocess_test tests/postprocess/ppe_gesture_postprocess_test.cpp)
+    target_compile_definitions(ppe_gesture_postprocess_test PRIVATE AIBOX_YOLOX_PPE_GESTURE1121=1)
+    add_executable(light_postprocess_test tests/postprocess/light_postprocess_test.cpp)
+    target_compile_definitions(light_postprocess_test PRIVATE AIBOX_YOLOX_LIGHT1121=1)
+    foreach(test_target ppe_gesture_postprocess_test light_postprocess_test)
         target_include_directories(${test_target} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/plugins/mlpostprocess_roi/modules)
     endforeach()
-    target_include_directories(gesture_postprocess_test PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include ${GST_INCLUDE_DIRS})
-    target_link_libraries(gesture_postprocess_test PRIVATE ${GST_LIBRARIES})
-    set(TEST_LABEL_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/config_snapshots)
-    add_test(NAME color8_postprocess_test COMMAND color8_postprocess_test
-        ${TEST_LABEL_ROOT}/1stage_andon_4cam/labels/classes_color8.txt
-        ${TEST_LABEL_ROOT}/ppe_4cam/labels/ppe_labels.txt)
-    add_test(NAME ppe_postprocess_test COMMAND ppe_postprocess_test
-        ${TEST_LABEL_ROOT}/ppe_4cam/labels/ppe_labels.txt
-        ${TEST_LABEL_ROOT}/andon_4cam/labels/stacklight.txt)
-    add_test(NAME stacklight_postprocess_test COMMAND stacklight_postprocess_test
-        ${TEST_LABEL_ROOT}/ppe_4cam/labels/ppe_labels.txt
-        ${TEST_LABEL_ROOT}/andon_4cam/labels/stacklight.txt)
-    add_test(NAME ppe_gesture1121_postprocess_test COMMAND ppe_gesture1121_postprocess_test
-        ${TEST_LABEL_ROOT}/ppe_gesture1123/labels/classes.txt)
-    add_test(NAME gesture_postprocess_test COMMAND gesture_postprocess_test
-        ${TEST_LABEL_ROOT}/raisehands_4cam/labels/gesture_labels.txt)
+    add_test(NAME ppe_gesture_postprocess_test COMMAND ppe_gesture_postprocess_test
+        ${CMAKE_CURRENT_SOURCE_DIR}/config_snapshots/unified_rtsp/labels/ppe.txt)
+    add_test(NAME light_postprocess_test COMMAND light_postprocess_test
+        ${CMAKE_CURRENT_SOURCE_DIR}/config_snapshots/light1121/labels/classes.json)
 endif()
 
 # --- install ---

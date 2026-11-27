@@ -4,11 +4,12 @@ name=YOLOX-S ppe_gesture1121 W8A16
 type=single
 output_type=detection
 stage_count=1
+then=light1121
 
 [grouping]
 group_by=algorithm_signature
 time_mux_enabled=1
-max_mux_group_size=6
+max_mux_group_size=4
 batch=1
 
 [stage.1]

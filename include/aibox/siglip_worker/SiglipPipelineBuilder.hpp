@@ -6,10 +6,16 @@
 #include <vector>
 
 namespace aibox::siglip {
+struct SiglipLiveSource {
+  std::string rtsp_url;
+  std::string frame_socket;
+  std::string frame_caps;
+};
+
 class SiglipPipelineBuilder {
  public:
   explicit SiglipPipelineBuilder(const WorkerConfig& config,
-                                 const std::string& rtsp_url = {});
+                                 const SiglipLiveSource& live = {});
   ~SiglipPipelineBuilder();
   SiglipPipelineBuilder(const SiglipPipelineBuilder&) = delete;
   SiglipPipelineBuilder& operator=(const SiglipPipelineBuilder&) = delete;

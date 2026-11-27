@@ -19,15 +19,15 @@ bash scripts/start_all/start_rtsp.sh
 bash scripts/start_all/stop_rtsp.sh
 ```
 
-- `--check` 解析主工作区的 `config/unified_rtsp.json` 并检查静态配置。 `--print-rules` 打印 SigLIP2 规则 TOML 片段。它们从脚本的快捷分支直接进入 Python。主工作区的 `--config` 参数可选择另一份 JSON；用同一配置启动和停止，以匹配 `state_dir`。11 月 25 日最简版已核对为 TXT 快照入口 `config_snapshots/unified_rtsp/pipeline_unified_rtsp.txt`。
+- `--check` 默认解析 `config_snapshots/unified_rtsp/pipeline_unified_rtsp.txt` 和相对路径 `include`，并检查静态配置。`--print-rules` 从各场景的 `[rule]` 打印 SigLIP2 规则 TOML 片段。`--config` 可显式选择另一套 TXT 快照或兼容的 JSON。启停时使用同一配置，确保 `state_dir` 相同。
 - 统一启动和独立 PPE／Light 启动共用 `_start_adreno_weston_forceon.sh`。该脚本仅在专用 `aibox-weston.service` 未运行时启动它。Weston 使用 headless/Pixman 和独立的 `/run/aibox-wayland/wayland-aibox` socket，GDM 继续负责实体桌面。环境脚本设置 Adreno EGL，图形检查校验服务、运行目录归属、五次 socket 连接、KGSL 权限和 Adreno ICD。
 - Supervisor 预检模型及二进制路径、NATS TCP、标注 RTSP bind，以及运行中 Rule Engine 实际读取的 SigLIP2 TOML。PPE 配置由 Rule Engine 单独读取。Supervisor 为每次运行生成 config、`workers.json`、`policy.json`、`state.json`、独立 registry 和日志，记录在 `output/unified_rtsp/run-*`。
-- 按配置顺序启动 SigLIP2 后启动 CNN，每个工作进程都等待健康证据。CNN 检查 PLAYING 和每相机 AGG 帧进展，SigLIP2 检查文本编码就绪及每个相机/场景的分数进展。启动错误或工作进程退出触发本次 worker 清理。普通运行返回 ready 后继续由 supervisor 监测停滞并标记 degraded；`bash scripts/start_all/start_rtsp.sh --verify-seconds 60` 在全体 ready 后进入专门的稳定性窗口，验证通过后结束该次运行。
+- 有共享帧的配置先启动 CNN，再启动消费这些帧的 SigLIP2 Scene。独立 RTSP 场景沿用原启动顺序。CNN 检查 PLAYING 和每相机 AGG 帧进展，SigLIP2 检查文本编码就绪及每个相机、场景的分数进展。启动错误或工作进程退出触发本次 worker 清理。普通运行在 ready 后继续监测停滞并标记 degraded。`bash scripts/start_all/start_rtsp.sh --verify-seconds 60` 在全体 ready 后进入稳定性窗口，并在验收结束时停止本次运行。
 - 停止按 `current.json` 找本次 supervisor 和 worker，校验 PID、启动时刻、可执行路径与 boot ID，通过 pidfd 向匹配进程发送信号。先 TERM 后限时检查，工作进程需要强制退出时记录 `forced_pids` 并标记失败。状态文件保留停止证据。
 
 源码：[启动入口](../../scripts/start_all/start_rtsp.sh) · [停止入口](../../scripts/start_all/stop_rtsp.sh) · [Supervisor](../../tools/rtsp_supervisor.py) · [Weston unit](../../scripts/systemd/aibox-weston.service) · [图形检查](../../scripts/aibox_graphics_gate.sh)
 
-同步摄像头地址时，旧 YOLO26 运维工具处理历史 TXT 快照。统一部署应直接更新启动脚本读取的配置，主工作区为 `config/unified_rtsp.json`。若使用 `setup_source_ip.sh` 更新微服务摄像头地址，统一部署应传入 `--skip-pipeline`，再单独更新统一配置。
+同步摄像头地址时，在 `config_snapshots/unified_rtsp/streams/` 按相机维护 `rtsp_url`。若使用 `setup_source_ip.sh` 更新微服务摄像头地址，统一部署应传入 `--skip-pipeline`，再单独更新上述相机文件。
 
 ## 3. 正常主进程收尾（verified）
 
@@ -41,23 +41,13 @@ bash scripts/start_all/stop_rtsp.sh
 
 备份提交 `5e40fe1` 中的旧组合启动先准备 Worker consumer，再启动 YOLO26 和 Worker。当前现场统一运行使用上文的启停入口。
 
-场景包装调用 [webrtc_start_common.sh](../../scripts/webrtc_start_common.sh)：
-
-1. 选择项目 runtime/vendor 插件库及图形 registry，设置环境。
-2. `pgrep -f` 找旧 CNN，`pkill -TERM -f` 终止并限时等待；此处不是逐个校验 executable/starttime 的精确 PID 模型。
-3. 检查本机 4222 监听，调用共享脚本确保专用 Weston 服务就绪，再执行图形检查和 VPU 检查。VPU 默认策略为 `if-needed`，满足条件时会调用 `reset_vpu.sh`。
-4. nohup/stdbuf 启动，优先用 `pgrep -x aibox_stream_pi | head -1` 得到 PID，退回 launch_pid。
-5. 最多约 90 秒等待本次日志 PIPELINE_READY，再最多约 80 秒累计 AGG 行数达到 AGG_NEED。
-
-AGG 行数阈值不检查每个唯一 camera；READY_FOR_BROWSER 只是历史脚本标记，没有提供 HTML/8080/WebRTC 服务。AGG_TIMEOUT 分支 TERM pidfile 进程并限时等待；BOOT_TIMEOUT/BOOT_GFX_ERROR 等分支没有相同集中清理，不能把注释中的“精确 PID/无孤儿”推广到所有分支。详见 [待审核问题](REVIEW.md)。
+独立 PPE 和 Light 的启动都调用 [公共运行脚本](../../scripts/webrtc_start_common.sh)。启动前检查现有 CNN、NATS、Weston、图形运行时和 VPU。发现已有 CNN 时提示先用其对应的停止入口。启动后使用本次子进程 PID，记录其启动时间，并等待本次日志出现 `PIPELINE_READY` 及所需的 AGG 行数。启动未达到就绪时，按进程身份发送 TERM 并限时等待。AGG 行数阈值仍按累计行数计算。
 
 ### 4.2 独立 CNN 与告警图片 Worker 的停止链
 
-独立 PPE／Light 的停止脚本调用 [共享 CNN 停止入口](../../scripts/yolo_x_stacklight_stop.sh)。告警图片 Worker 独立运行时用 [Worker 停止入口](../../scripts/siglip/siglip_stop.sh)。
+[PPE 停止入口](../../scripts/ppe_gesture/ppe_gesture_stop.sh) 和 [Light 停止入口](../../scripts/light/light_stop.sh) 各自读取对应运行目录的 PID 记录，校验启动时间、可执行文件和快照路径，再发 TERM，默认等待 30 秒。若超时报出该 PID 并返回失败。VPU 检查和恢复策略仍由独立启动前的检查处理。
 
-CNN 停止路径使用 pgrep/pkill -f；默认 TERM_GRACE=30，进程退出后仍调用 VPU probe，策略允许时可重置。`AIBOX_STOP_FORCE=1` 的 force 路径使用 fuser -k /dev/video32/33，影响范围不等同精确 CNN PID。build 脚本不重置 VPU/Weston，不能推出运行脚本也不重置。
-
-[Worker 进程辅助](../../scripts/siglip/worker_process.sh) 与 [siglip_stop.sh](../../scripts/siglip/siglip_stop.sh) 会校验 PID、启动时间、可执行文件与配置身份，控制锁忙/身份不明/超时非零退出；TERM 后需要 SIGLIP_SHUTDOWN_OK state=NULL。它与 CNN 的宽匹配停止机制应分开描述。
+[告警图片 Worker 停止入口](../../scripts/siglip/siglip_stop.sh) 校验 PID、启动时间、可执行文件与配置身份，TERM 后检查 `SIGLIP_SHUTDOWN_OK state=NULL`。
 
 Worker 的 durable/本地提交/ACK 顺序见 [数据契约](data_contracts.md)；SIGLIP_READY 只代表 consumer/图就绪，SIGLIP_FIRST_INFERENCE_OK 才证明出现一次实际推理。
 

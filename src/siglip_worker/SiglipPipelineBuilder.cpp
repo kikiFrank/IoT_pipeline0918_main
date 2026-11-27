@@ -35,7 +35,7 @@ GstElement* Make(GstElement* pipeline, const char* type, const char* name) {
 }
 }  // namespace
 SiglipPipelineBuilder::SiglipPipelineBuilder(const WorkerConfig& config,
-                                             const std::string& rtsp_url)
+                                             const SiglipLiveSource& live)
     : config_(config) {
   gst_init(nullptr, nullptr);
   const bool text_encoder = config_.postprocess_module == "siglip2-text";
@@ -81,7 +81,7 @@ SiglipPipelineBuilder::SiglipPipelineBuilder(const WorkerConfig& config,
     g_object_get(qnn, "backend-device-id", &applied, nullptr);
     if (config_.require_device_id && applied != static_cast<guint>(config_.htp_device_id))
       throw std::runtime_error("HTP device ID readback differs");
-    if (text_encoder || !rtsp_url.empty()) {
+    if (text_encoder || !live.rtsp_url.empty() || !live.frame_socket.empty()) {
       std::cout << "[SIGLIP_HTP] model=" << config_.postprocess_module
                 << " backend-device-id=" << applied << std::endl;
     }
@@ -121,7 +121,20 @@ SiglipPipelineBuilder::SiglipPipelineBuilder(const WorkerConfig& config,
     }
     if (!input_linked || !gst_element_link_many(qnn, post, text, sink_, nullptr))
       throw std::runtime_error("SigLIP pipeline link failed");
-    if (!rtsp_url.empty()) {
+    if (!live.frame_socket.empty()) {
+      auto* shm = Make(pipeline_, "shmsrc", "scene_shm");
+      auto* caps = Make(pipeline_, "capsfilter", "scene_shm_caps");
+      auto* sink = Make(pipeline_, "appsink", "scene_frames");
+      SetCaps(caps, live.frame_caps.c_str());
+      g_object_set(shm, "socket-path", live.frame_socket.c_str(),
+                   "is-live", TRUE, "do-timestamp", TRUE, nullptr);
+      g_object_set(sink, "sync", FALSE, "async", FALSE, "max-buffers", 1u,
+                   "drop", TRUE, "enable-last-sample", FALSE, nullptr);
+      if (!gst_element_link_many(shm, caps, sink, nullptr))
+        throw std::runtime_error("shared scene frame source link failed");
+      live_sink_ = GST_ELEMENT(gst_object_ref(sink));
+      std::cout << "[SIGLIP_FRAME_SOURCE] shm=" << live.frame_socket << std::endl;
+    } else if (!live.rtsp_url.empty()) {
       GError* parse_error = nullptr;
       GstElement* capture = gst_parse_bin_from_description(
           "rtspsrc name=scene_rtsp protocols=tcp latency=160 tcp-timeout=5000000 "
@@ -146,7 +159,7 @@ SiglipPipelineBuilder::SiglipPipelineBuilder(const WorkerConfig& config,
         if (rtsp) gst_object_unref(rtsp);
         throw std::runtime_error("RTSP capture elements missing");
       }
-      g_object_set(rtsp, "location", rtsp_url.c_str(), nullptr);
+      g_object_set(rtsp, "location", live.rtsp_url.c_str(), nullptr);
       gst_object_unref(rtsp);
     }
     bus_ = gst_element_get_bus(pipeline_);
@@ -178,7 +191,7 @@ void SiglipPipelineBuilder::CheckBus() {
   }
 }
 GstSample* SiglipPipelineBuilder::PullLiveFrame(GstClockTime timeout) {
-  if (!live_sink_) throw std::runtime_error("SigLIP RTSP capture unavailable");
+  if (!live_sink_) throw std::runtime_error("SigLIP live capture unavailable");
   CheckBus();
   return gst_app_sink_try_pull_sample(GST_APP_SINK(live_sink_), timeout);
 }

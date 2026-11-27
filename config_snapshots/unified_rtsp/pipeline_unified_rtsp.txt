@@ -28,7 +28,7 @@ caps_mode=canonical_raw
 group_caps=video/x-raw,format=NV12,width=1920,height=1080,interlace-mode=progressive
 enabled=1
 plugin=aiboxtimemux
-max_group_size=6
+max_group_size=4
 wait_timeout_ms=200
 drop_policy=latest
 pad_mode=request
@@ -58,18 +58,20 @@ decoder=v4l2h265dec
 output_caps=video/x-raw,format=NV12
 
 [streams]
+# TimeMux groups each algorithm in include order. For Light, list the four
+# Light-only cameras before the four with SigLIP2 scenes.
+include=streams/cam-005.txt
+include=streams/cam-006.txt
+include=streams/cam-010.txt
+include=streams/cam-012.txt
 include=streams/cam-001.txt
 include=streams/cam-002.txt
 include=streams/cam-003.txt
+include=streams/cam-009.txt
 include=streams/cam-004.txt
-include=streams/cam-005.txt
-include=streams/cam-006.txt
 include=streams/cam-007.txt
 include=streams/cam-008.txt
-include=streams/cam-009.txt
-include=streams/cam-010.txt
 include=streams/cam-011.txt
-include=streams/cam-012.txt
 
 [algorithms]
 include=algorithms/ppe.txt

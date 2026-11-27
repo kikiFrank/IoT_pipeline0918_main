@@ -8,6 +8,7 @@
 #include "aibox/face/face_result_state_meta_types.hpp"
 #include "aibox/face/face_mask_policy.hpp"
 #include "aibox/pipeline/FaceOcOverlay.hpp"
+#include "aibox/media/AnomalySnapshotService.hpp"
 
 #include <gst/video/video.h>
 #include <gst/rtsp/gstrtsptransport.h>
@@ -31,6 +32,7 @@
 #include <vector>
 
 #include <gst/app/gstappsink.h>
+#include <gst/app/gstappsrc.h>
 
 namespace aibox::pipeline {
 
@@ -295,6 +297,107 @@ static void OnRtspPadAdded(GstElement* src, GstPad* new_pad, gpointer data) {
   gst_caps_unref(caps);
   gst_object_unref(sink);
 }
+
+namespace {
+struct SceneFrameOutput {
+  GstAppSrc* source = nullptr;  // Owned by the same pipeline as the probe.
+  gint64 next_frame_us = 0;
+};
+
+using SceneFrameOutputs = std::unordered_map<CameraId, SceneFrameOutput>;
+
+GstPadProbeReturn ExportSceneFrame(GstPad* pad, GstPadProbeInfo* info, gpointer data) {
+  auto& outputs = *static_cast<SceneFrameOutputs*>(data);
+  auto* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+  if (!buffer || GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_GAP))
+    return GST_PAD_PROBE_OK;
+  const auto api = g_type_from_name("GstAiboxFrameMetaAPI");
+  const auto* frame = api ? reinterpret_cast<const GstAiboxFrameMeta*>(
+      gst_buffer_get_meta(buffer, api)) : nullptr;
+  if (!frame || !frame->camera_id) return GST_PAD_PROBE_OK;
+  auto output = outputs.find(frame->camera_id);
+  if (output == outputs.end()) return GST_PAD_PROBE_OK;
+  const auto now = g_get_monotonic_time();
+  auto& [source, next_frame_us] = output->second;
+  if (now < next_frame_us) return GST_PAD_PROBE_OK;
+  next_frame_us = now + G_USEC_PER_SEC / 2;  // The scene samples the latest frame at 1 Hz.
+
+  GstCaps* caps = gst_pad_get_current_caps(pad);
+  std::unique_ptr<GstSample, decltype(&gst_sample_unref)> sample(
+      caps ? gst_sample_new(buffer, caps, nullptr, nullptr) : nullptr, gst_sample_unref);
+  if (caps) gst_caps_unref(caps);
+  auto pixels = std::make_unique<std::vector<std::uint8_t>>();
+  uint32_t width = 0, height = 0;
+  if (!media::AnomalySnapshotService::CopySampleToPackedNv12(
+          sample.get(), *pixels, width, height)) {
+    GST_WARNING_OBJECT(source, "Cannot copy the post-inference NV12 frame for %s", frame->camera_id);
+    return GST_PAD_PROBE_OK;
+  }
+  const auto bytes = pixels->size();
+  auto* copy = gst_buffer_new_wrapped_full(GST_MEMORY_FLAG_READONLY,
+      pixels->data(), bytes, 0, bytes, pixels.get(),
+      [](gpointer ptr) { delete static_cast<std::vector<std::uint8_t>*>(ptr); });
+  if (copy) {
+    pixels.release();
+    // Only the packed copy reaches appsrc. The hardware frame continues to the overlay.
+    gst_app_src_push_buffer(source, copy);
+  }
+  return GST_PAD_PROBE_OK;
+}
+
+Status AttachSceneFrameExport(GstElement* pipeline, GstElement* last_metamux,
+                              const TimeMuxGroupPlan& group,
+                              const std::unordered_map<CameraId, std::string>& sockets) {
+  auto outputs = std::make_unique<SceneFrameOutputs>();
+  for (const auto& camera : group.camera_ids) {
+    const auto socket = sockets.find(camera);
+    if (socket == sockets.end()) continue;
+    const std::string name = "scene_raw_" + camera;
+    GError* error = nullptr;
+    GstElement* branch = gst_parse_bin_from_description(
+        "appsrc name=frames is-live=true format=time do-timestamp=true block=false "
+        "max-buffers=1 max-bytes=0 leaky-type=downstream "
+        "! shmsink name=shared sync=false async=false wait-for-connection=false "
+        "enable-last-sample=false shm-size=16777216 perms=384", FALSE, &error);
+    if (!branch || error) {
+      const std::string detail = error ? error->message : "missing scene branch";
+      g_clear_error(&error);
+      if (branch) gst_object_unref(branch);
+      return Status::Error("SCENE_FRAME_EXPORT_FAILED", camera + ": " + detail);
+    }
+    gst_element_set_name(branch, name.c_str());
+    auto* source = gst_bin_get_by_name(GST_BIN(branch), "frames");
+    auto* sink = gst_bin_get_by_name(GST_BIN(branch), "shared");
+    GstCaps* caps = gst_caps_from_string(group.mux_scheduler.group_caps.c_str());
+    if (!source || !sink || !caps || !gst_caps_is_fixed(caps)) {
+      if (source) gst_object_unref(source);
+      if (sink) gst_object_unref(sink);
+      if (caps) gst_caps_unref(caps);
+      gst_object_unref(branch);
+      return Status::Error("SCENE_FRAME_EXPORT_FAILED", camera + ": expected fixed raw caps");
+    }
+    gst_app_src_set_caps(GST_APP_SRC(source), caps);
+    gst_caps_unref(caps);
+    g_object_set(sink, "socket-path", socket->second.c_str(), nullptr);
+    outputs->emplace(camera, SceneFrameOutput{GST_APP_SRC(source)});
+    gst_object_unref(source);
+    gst_object_unref(sink);
+    if (!gst_bin_add(GST_BIN(pipeline), branch)) {
+      gst_object_unref(branch);
+      return Status::Error("SCENE_FRAME_EXPORT_FAILED", camera + ": cannot add export branch");
+    }
+    fprintf(stderr, "[SCENE_FRAME_EXPORT] camera=%s after=%s socket=%s\n",
+            camera.c_str(), GST_ELEMENT_NAME(last_metamux), socket->second.c_str());
+  }
+  if (!outputs->empty()) {
+    auto* pad = gst_element_get_static_pad(last_metamux, "src");
+    gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BUFFER, ExportSceneFrame, outputs.release(),
+        [](gpointer ptr) { delete static_cast<SceneFrameOutputs*>(ptr); });
+    gst_object_unref(pad);
+  }
+  return Status::Ok();
+}
+}  // namespace
 
 /* Dynamically create GstAiboxFrameMeta and fill camera_id + frame_id.
  * Other fields left empty/zero; aiboxtimemux completes them. */
@@ -643,6 +746,63 @@ bool FlowTapEnabled() {
 
 static GstPadProbeReturn
 OnFaceOverlaySinkProbe(GstPad* pad, GstPadProbeInfo* info, gpointer user_data);
+
+static GQuark HiddenOverlayRois() {
+  return g_quark_from_static_string("aibox-hidden-overlay-rois");
+}
+
+static GstPadProbeReturn LimitSerialOverlayRois(GstPad*, GstPadProbeInfo* info, gpointer) {
+  // qtivoverlay holds up to 50 ROI drawing buffers during one frame. The two
+  // detectors can produce up to 100 combined. Limit rendering only.
+  constexpr guint kDrawLimit = 50;
+  auto* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+  if (!buffer || !gst_buffer_is_writable(buffer) ||
+      gst_buffer_get_n_meta(buffer, GST_VIDEO_REGION_OF_INTEREST_META_API_TYPE) <= kDrawLimit)
+    return GST_PAD_PROBE_OK;
+
+  std::unordered_map<GQuark, unsigned> counts;
+  std::vector<std::pair<unsigned, GstVideoRegionOfInterestMeta*>> ranked;
+  gpointer state = nullptr;
+  while (auto* meta = gst_buffer_iterate_meta_filtered(
+             buffer, &state, GST_VIDEO_REGION_OF_INTEREST_META_API_TYPE)) {
+    auto* roi = reinterpret_cast<GstVideoRegionOfInterestMeta*>(meta);
+    ranked.emplace_back(counts[roi->roi_type]++, roi);
+  }
+  // Keep detections from each label visible before filling the remaining slots.
+  std::stable_sort(ranked.begin(), ranked.end(), [](const auto& left, const auto& right) {
+    return left.first < right.first;
+  });
+  auto* hidden = gst_buffer_new();
+  if (!hidden) return GST_PAD_PROBE_OK;
+  for (auto it = ranked.begin() + kDrawLimit; it != ranked.end(); ++it) {
+    auto* roi = it->second;
+    auto* saved = gst_buffer_add_video_region_of_interest_meta_id(
+        hidden, roi->roi_type, roi->x, roi->y, roi->w, roi->h);
+    if (!saved) continue;
+    saved->id = roi->id;
+    saved->parent_id = roi->parent_id;
+    for (const GList* param = roi->params; param; param = param->next)
+      gst_video_region_of_interest_meta_add_param(saved,
+          gst_structure_copy(static_cast<const GstStructure*>(param->data)));
+    gst_buffer_remove_meta(buffer, &roi->meta);
+  }
+  gst_mini_object_set_qdata(GST_MINI_OBJECT(buffer), HiddenOverlayRois(), hidden,
+      [](gpointer data) { gst_buffer_unref(GST_BUFFER(data)); });
+  return GST_PAD_PROBE_OK;
+}
+
+static GstPadProbeReturn RestoreSerialOverlayRois(GstPad*, GstPadProbeInfo* info, gpointer) {
+  auto* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+  if (!buffer) return GST_PAD_PROBE_OK;
+  auto* hidden = static_cast<GstBuffer*>(
+      gst_mini_object_steal_qdata(GST_MINI_OBJECT(buffer), HiddenOverlayRois()));
+  if (!hidden) return GST_PAD_PROBE_OK;
+  buffer = gst_buffer_make_writable(buffer);
+  GST_PAD_PROBE_INFO_DATA(info) = buffer;
+  gst_buffer_copy_into(buffer, hidden, GST_BUFFER_COPY_META, 0, static_cast<gsize>(-1));
+  gst_buffer_unref(hidden);
+  return GST_PAD_PROBE_OK;
+}
 
 static bool AttachOverlayMaskProbe(GstElement* overlay, int diag_group,
                                    std::string* err) {
@@ -1993,9 +2153,12 @@ Result<GstPipelineBuildResult> GstPipelineBuilder::Build(
     // --- inference chain (chained qtimetamux, strict serial) or fakesink ---
     if (opts_.enable_yolo_stages && !plan.stage_plans.empty()) {
       std::string err;
+      const bool serial = std::count_if(plan.stage_plans.begin(), plan.stage_plans.end(),
+          [&](const auto& stage) { return stage.time_mux_group_id == tmux.time_mux_group_id; }) > 1;
       GstElement* mux_q = MakeElement("queue",
           "queue_after_mux_" + tmux.time_mux_group_id, &err);
-      ConfigureBoundedQueue(mux_q, 10);
+      // Shed old frames before the tee, so both sides still receive the same set.
+      ConfigureBoundedQueue(mux_q, serial ? 2 : 10, serial ? 2 : 0);
       gst_bin_add(GST_BIN(result.pipeline), mux_q);
       if (!gst_element_link(mux, mux_q))
         return {Status::Error("LINK_FAILED", "mux -> mux_q"), GstPipelineBuildResult{}};
@@ -2025,12 +2188,16 @@ Result<GstPipelineBuildResult> GstPipelineBuilder::Build(
         // P1 (3/3 vote, 2026-08-19): non-leaky inf/bypass so qtimetamux(sync)
         // can pair the same frame. Load-shed stays on aiboxtimemux
         // drop-policy=latest. Leaky dual-arm was 1912 QNN vs 231 OUT.
-        ConfigureBoundedQueue(q_inf, 10, 0);
-        ConfigureBoundedQueue(q_byp, 10, 0);
-        ConfigureBoundedQueue(q_txt, 10);
+        // A serial chain holds the decoder's original buffers across both stages.
+        // Bound raw-frame retention without dropping either side of a matching pair.
+        const guint stage_queue = serial ? 2 : 10;
+        ConfigureBoundedQueue(q_inf, stage_queue, 0);
+        ConfigureBoundedQueue(q_byp, stage_queue, 0);
+        ConfigureBoundedQueue(q_txt, stage_queue);
 
         gst_util_set_object_arg(G_OBJECT(mmux), "mode", "sync");
         g_object_set(mmux, "latency", (guint64)(2 * GST_SECOND), nullptr);
+        if (serial) g_object_set(mmux, "queue-size", 3u, nullptr);
         gst_bin_add_many(GST_BIN(result.pipeline),
                          tee, q_inf, q_byp, q_txt, mmux, nullptr);
 
@@ -2058,6 +2225,12 @@ Result<GstPipelineBuildResult> GstPipelineBuilder::Build(
       if (!last_metamux)
         return {Status::Error("NO_STAGE_FOR_GROUP", tmux.time_mux_group_id),
                 GstPipelineBuildResult{}};
+
+      st = AttachSceneFrameExport(result.pipeline, last_metamux, tmux, opts_.scene_frame_sockets);
+      if (!st.ok) {
+        gst_object_unref(result.pipeline);
+        return {st, GstPipelineBuildResult{}};
+      }
 
       // Terminal topology:
       //   last_metamux → qtivoverlay → tee_post
@@ -2192,6 +2365,14 @@ Result<GstPipelineBuildResult> GstPipelineBuilder::Build(
             return {Status::Error("FACE_PROBE_FAILED",
                     probe_err + " for " + tmux.time_mux_group_id),
                     GstPipelineBuildResult{}};
+        }
+        if (serial) {
+          auto* sink = gst_element_get_static_pad(overlay, "sink");
+          auto* src = gst_element_get_static_pad(overlay, "src");
+          gst_pad_add_probe(sink, GST_PAD_PROBE_TYPE_BUFFER, LimitSerialOverlayRois, nullptr, nullptr);
+          gst_pad_add_probe(src, GST_PAD_PROBE_TYPE_BUFFER, RestoreSerialOverlayRois, nullptr, nullptr);
+          gst_object_unref(sink);
+          gst_object_unref(src);
         }
 
         DiagAttach(overlay, "src", D_OV_SRC);

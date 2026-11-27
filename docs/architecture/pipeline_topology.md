@@ -53,7 +53,9 @@ Builder 可按 `AIBOX_WEBRTC_SPLITTER=camsplit` 使用 appsink/appsrc 拷贝式 
 
 ## 6. 统一 RTSP 当前拓扑
 
-[主工作区统一 JSON](../../config/unified_rtsp.json) 配置 8 路 CNN 和 4 路实时 SigLIP2，分配见 [系统总览](system_overview.md)。CNN 进程从渲染的 TXT 读取 PPE 与 Light 两个 profile，使用 `batch=1`。SigLIP2 每个相机进程持有自己的 RTSP 和 Image Encoder。cam-007 的两组词在同一进程中使用同帧图像向量，因此该路只开启一份实时图像链。当前统一入口校验每条 URL 在配置中只出现一次。[Supervisor](../../tools/rtsp_supervisor.py) · [场景主程序](../../src/siglip_worker/SceneMain.cpp)
+PPE 算法文件里的 `then=light1121` 生成两级全帧串联，每级经 `tee`、有界 `queue` 和同步 `qtimetamux` 合并该帧的检测结果。串联组在 `tee` 前最多排队两帧，队列满时丢最旧帧。分叉后的推理、旁路和 metadata 队列保留帧配对。串联组的 `qtivoverlay` 最多绘制 50 个 ROI，超出的检测会在绘制后恢复到帧元数据，供检测事件和规则继续使用。[PPE 算法配置](../../config_snapshots/unified_rtsp/algorithms/ppe.txt) · [GStreamer 构图器](../../src/pipeline/GstPipelineBuilder.cpp)
+
+同时配置 `cnn` 与 `scenes` 的相机，由 CNN 进程在最后一级 `qtimetamux` 后、绘制前复制 NV12，经每相机共享内存 socket 交给 Scene 进程。发布队列保留最新帧，场景侧沿用约 1 Hz 采样。`cam-007` 的两组词共用一份图像向量。12 路均由 CNN 进程解码，分配见系统总览。[Supervisor](../../tools/rtsp_supervisor.py) · [场景主程序](../../src/siglip_worker/SceneMain.cpp) · [相机分配](system_overview.md)
 
 TimeMux 选用 `canonical_raw`，主配置给出 1920×1080 NV12、progressive 的 group caps。插件比较可归一化差异时去掉 framerate 和 colorimetry，输出 canonical caps 声明可变帧率 `0/1`。这些协商规则允许同组输入的帧率不同，保留其他 caps 检查。输出吞吐与每路标注播放仍需用实际连接测量。[TimeMux 实现](../../plugins/aiboxtimemux/gstaiboxtimemux.cpp)
 

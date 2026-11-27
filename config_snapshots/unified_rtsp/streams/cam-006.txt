@@ -3,8 +3,8 @@ camera_id=cam-006
 name=cam-006
 enabled=1
 source_type=rtsp
-rtsp_url=rtsp://192.168.50.140:8556/cam-024
+rtsp_url=rtsp://192.168.50.140:8556/cam-026
 encoding=h264
 
 [inference]
-algorithm=light1121
+algorithm=ppe_gesture1121

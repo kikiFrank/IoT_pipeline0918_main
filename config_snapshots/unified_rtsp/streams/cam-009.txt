@@ -3,8 +3,8 @@ camera_id=cam-009
 name=cam-009
 enabled=1
 source_type=rtsp
-rtsp_url=rtsp://192.168.50.140:8556/cam-027
+rtsp_url=rtsp://192.168.50.140:8556/cam-035
 encoding=h264
 
 [inference]
-scenes=people_gathering
+algorithm=light1121

@@ -27,8 +27,8 @@ init 将字符串/caps 置 null、pts=GST_CLOCK_TIME_NONE、batch ID 置无效 s
 
 | 模型配置 | 已核对的配置事实 | 尚不能作出的结论 |
 |---|---|---|
-| [统一 PPE 1123](../../config/unified_rtsp.json) | YOLOX-S W8A16，标签顺序 human/white_hat/white_cloth/gesture，配置 output 1,8400,9，confidence=0.70，NMS=0.45，results=50，模块 `yolox-ppe-gesture1121` | 原始 Tensor dtype、量化与真值识别指标需用对应 BIN 和运行样本核验 |
-| [统一 Light 1121](../../config/unified_rtsp.json) | YOLOX-S W8A16，标签顺序 red/yellow/green/none，配置 output 1,8400,9，confidence=0.25，NMS=0.65，results=50，模块 `yolox-light1121`。框颜色对应红、黄、绿、灰 | 单帧灯框可供下游评估，灯色持续时长和触发行为由规则配置决定 |
+| [统一 PPE 1123](../../config_snapshots/unified_rtsp/models/ppe.txt) | YOLOX-S W8A16，标签顺序 human/white_hat/white_cloth/gesture，配置 output 1,8400,9，confidence=0.70，NMS=0.45，results=50，模块 `yolox-ppe-gesture1121` | 原始 Tensor dtype、量化与真值识别指标需用对应 BIN 和运行样本核验 |
+| [统一 Light 1121](../../config_snapshots/unified_rtsp/models/light.txt) | YOLOX-S W8A16，标签顺序 red/yellow/green/none，配置 output 1,8400,9，confidence=0.25，NMS=0.65，results=50，模块 `yolox-light1121`。框颜色对应红、黄、绿、灰 | 单帧灯框可供下游评估，灯色持续时长和触发行为由规则配置决定 |
 | [历史 PPE descriptor](https://github.com/kikiFrank/IoT_pipeline0918_main/blob/5e40fe10b2d3057f59f3b40e2403f7e6680cfee3/config_snapshots/ppe_4cam/models/yolox_ppe_w8a16.txt) | `images`，NHWC，640×640×3，uint16。输出 `[1,8400,8]`，uint16。配置为 centre/reverse、GLES、confidence=0.05、NMS=0.45 | 历史工程记录的 QNN 下游 dtype 为 FLOAT32，具体转换位置和量化参数需按当时版本验证 |
 | [历史八类 Andon descriptor](https://github.com/kikiFrank/IoT_pipeline0918_main/blob/5e40fe10b2d3057f59f3b40e2403f7e6680cfee3/config_snapshots/1stage_andon_4cam/models/yolox_s_color8_640_w8a16.txt) | `images`，NHWC，640×640×3，uint16。输出 `[1,8400,13]`，uint16。8 类，confidence=0.25、NMS=0.65 | 运行期 Tensor 契约与精度按具体模型和后端验证 |
 | [Worker config](../../config_snapshots/siglip_worker/worker.txt) | 模型预期 SHA 已配置；uint16 NHWC 1,224,224,3；expected_embedding_dim=768；HTP device=1 | 配置 SHA 不等于本次核验了真实 BIN；模型 raw output 量化须以运行时 tensor meta/实际模型核对 |
@@ -67,7 +67,7 @@ Zone 快照包含非负整数 `config_version` 和 `zones` 列表。启用的条
 
 JSON 配置写入每个场景的正负文本、各 64 个预分词 token 和 prompt_version。Supervisor 将同相机多组场景写入一个进程配置，要求使用同一 ROI。Scene 进程在同一个 HTP 先完成 Text Encoder 推理并释放它，然后开启实时 Image Encoder。优先选择设备节点 `/dev/fastrpc-cdsp1` 对应的 HTP 1，存在 `/dev/fastrpc-cdsp` 时可回退到 HTP 0。候选向量留在进程内，流重连继续复用。
 
-SceneMain 使用两种 L2 归一化向量的点积为 cosine，以 `100 / (1 + exp(-(112.66890226978423 * cosine - 16.771724700927734)))` 分别计算正负分数。Wire 字段沿用 `clutter_score`（正）和 `clean_score`（负）。Rust 按两分之差和对应场景的阈值、连续样本、恢复与冷却判定。阈值见 [统一配置](../../config/unified_rtsp.json)，行为见 [C++ 场景主程序](../../src/siglip_worker/SceneMain.cpp) 与 [Rust 场景监测](../../../IoT_edge/aibox/crates/aibox-rule_engine/src/rule/workstation_organization_monitor.rs)。
+SceneMain 使用两种 L2 归一化向量的点积为 cosine，以 `100 / (1 + exp(-(112.66890226978423 * cosine - 16.771724700927734)))` 分别计算正负分数。Wire 字段沿用 `clutter_score`（正）和 `clean_score`（负）。Rust 按两分之差和对应场景的阈值、连续样本、恢复与冷却判定。阈值见 [各场景配置](../../config_snapshots/unified_rtsp/scenes/)，行为见 [C++ 场景主程序](../../src/siglip_worker/SceneMain.cpp) 与 [Rust 场景监测](../../../IoT_edge/aibox/crates/aibox-rule_engine/src/rule/workstation_organization_monitor.rs)。
 
 ## 6. 告警图片 Worker 的 durable、outbox 与 ACK（verified）
 

@@ -1,19 +1,25 @@
-"""Board-only five-image comparison against the fixed QNN board_001 corpus."""
+"""Compare deployed SigLIP2 preprocessing and embeddings with a QNN reference set."""
+import argparse
 import array
 import json
 import math
-import os
 from pathlib import Path
 import struct
 import subprocess
-import sys
 
 
 SOURCE = Path(__file__).resolve().parents[2]
-DATASET = Path(os.environ.get("SIGLIP_REFERENCE_DATASET", "/mnt/workspace/1027siglips"))
-OUT = SOURCE / "output/siglip_worker/preprocess_test"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("reference_dataset", type=Path)
+parser.add_argument("--build-dir", type=Path, default=SOURCE / "build-review-siglip")
+parser.add_argument("--output-dir", type=Path, default=SOURCE / "output/siglip_worker/preprocess_test")
+parser.add_argument("--htp-device-id", type=int, choices=(0, 1),
+                    default=int(Path("/dev/fastrpc-cdsp1").exists()))
+args = parser.parse_args()
+DATASET = args.reference_dataset
+OUT = args.output_dir
 OUT.mkdir(parents=True, exist_ok=True)
-PROBE = SOURCE / "build-review-siglip/siglip_preprocess_probe"
+PROBE = args.build_dir / "siglip_preprocess_probe"
 MODEL = SOURCE / "data/models/siglip2/image_encoder.bin"
 
 
@@ -32,8 +38,10 @@ def expected_rgb(path):
     return bytes(max(0, min(255, round(float(value) * 255))) for value in values)
 
 
-rows = [json.loads(line) for _, line in zip(range(5),
-                                             (DATASET / "data/manifest.jsonl").open())]
+with (DATASET / "data/manifest.jsonl").open(encoding="utf-8") as manifest:
+    rows = [json.loads(line) for _, line in zip(range(5), manifest)]
+if len(rows) != 5:
+    raise RuntimeError("reference set must contain at least five images")
 results = []
 for row in rows:
     index = row["index"]
@@ -69,7 +77,7 @@ for row in rows:
          "video/x-raw,format=RGB", "!", "qtimlvconverter", "engine=gles",
          "image-disposition=stretch", "subpixel-layout=regular", "!", "qtimlqnn",
          f"model={MODEL}", "backend=/usr/lib/libQnnHtp.so",
-         "system=/usr/lib/libQnnSystem.so", "backend-device-id=1",
+         "system=/usr/lib/libQnnSystem.so", f"backend-device-id={args.htp_device_id}",
          "tensors=<image_embeds>", "!", "qtimlpostprocess_roi", "module=siglip2-image",
          "!", "text/x-raw,format=utf8", "!", "filesink", f"location={output}"])
     embedding = json.loads(output.read_bytes().rstrip(b"\0"))["embedding"]

@@ -52,7 +52,8 @@ struct PromptPair {
 };
 
 struct SceneConfig {
-  std::string camera_id, rtsp_url, nats_url, media_dir;
+  std::string camera_id, nats_url, media_dir;
+  siglip::SiglipLiveSource live;
   std::array<double, 4> roi_xyxy{0.22, 0.245, 0.74, 0.945};
   WorkerConfig image, text;
   std::vector<PromptPair> prompts;
@@ -101,7 +102,18 @@ SceneConfig LoadScene(const std::filesystem::path& path) {
   auto* root = siglip::RootObject(json.get());
   SceneConfig config;
   config.camera_id = siglip::String(root, "camera_id");
-  config.rtsp_url = siglip::String(root, "rtsp_url");
+  if (json_object_has_member(root, "frame_socket")) {
+    const auto socket = siglip::String(root, "frame_socket");
+    config.live.frame_caps = siglip::String(root, "frame_caps");
+    if (socket.empty() || config.live.frame_caps.empty() ||
+        json_object_has_member(root, "rtsp_url"))
+      throw std::runtime_error("invalid shared scene frame source");
+    config.live.frame_socket = (path.parent_path() / socket).lexically_normal().string();
+  } else {
+    config.live.rtsp_url = siglip::String(root, "rtsp_url");
+    if (config.live.rtsp_url.compare(0, 7, "rtsp://") != 0)
+      throw std::runtime_error("invalid scene RTSP source");
+  }
   config.nats_url = siglip::String(root, "nats_url");
   config.media_dir = siglip::String(root, "media_dir");
   if (json_object_has_member(root, "roi_xyxy")) {
@@ -118,9 +130,7 @@ SceneConfig LoadScene(const std::filesystem::path& path) {
         config.roi_xyxy[1] >= config.roi_xyxy[3])
       throw std::runtime_error("roi_xyxy must have positive area");
   }
-  if (config.camera_id.empty() ||
-      config.rtsp_url.compare(0, 7, "rtsp://") != 0 ||
-      config.nats_url.empty() || config.media_dir.empty())
+  if (config.camera_id.empty() || config.nats_url.empty() || config.media_dir.empty())
     throw std::runtime_error("invalid scene endpoints");
   const auto revision = siglip::Sha256(contents.data(), contents.size()).substr(0, 12);
   if (json_object_has_member(root, "scenes")) {
@@ -264,7 +274,7 @@ std::uint64_t MonotonicMs() {
 void RunStream(const SceneConfig& config, const std::vector<TextEmbeddings>& text_embeddings,
                adapter::NatsAdapter& nats,
                media::FrameSnapshotCache& cache) {
-  siglip::SiglipPipelineBuilder image(config.image, config.rtsp_url);
+  siglip::SiglipPipelineBuilder image(config.image, config.live);
   image.WaitReady();
   SceneImagePreprocessor preprocess(config.roi_xyxy);
   const auto epoch = detection::UuidV4();
@@ -275,7 +285,7 @@ void RunStream(const SceneConfig& config, const std::vector<TextEmbeddings>& tex
     std::unique_ptr<GstSample, SampleDeleter> sample(image.PullLiveFrame(250 * GST_MSECOND));
     const auto now = MonotonicMs();
     if (!sample) {
-      if (now - last_frame > 8000) throw std::runtime_error("RTSP frame timeout");
+      if (now - last_frame > 8000) throw std::runtime_error("scene frame timeout");
       continue;
     }
     last_frame = now;

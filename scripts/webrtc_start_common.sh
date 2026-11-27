@@ -9,7 +9,56 @@ set +e
 cd "$R" || { echo ROOT_MISSING="$R"; exit 3; }
 
 DEMO="$R/build_unified/aibox_stream_pipeline_demo"
-mkdir -p "$OUT"
+mkdir -p "$OUT" || exit 4
+PIDFILE="$OUT/demo.pid"
+
+demo_starttime() {
+  local stat
+  local -a fields
+  stat=$(cat "/proc/$1/stat" 2>/dev/null) || return 1
+  read -r -a fields <<< "${stat##*) }"
+  [[ ${#fields[@]} -ge 20 && "${fields[0]}" != Z ]] || return 1
+  printf '%s\n' "${fields[19]}"
+}
+
+demo_owned() {
+  [[ "$demo_pid" =~ ^[1-9][0-9]*$ && -n "$demo_start" ]] || return 1
+  [[ "$(demo_starttime "$demo_pid")" == "$demo_start" ]] || return 1
+  [[ "$(readlink -f "/proc/$demo_pid/exe" 2>/dev/null)" == "$(readlink -f "$DEMO")" ]] || return 1
+  local argument previous=''
+  while IFS= read -r -d '' argument; do
+    [[ "$previous" == --snapshot && "$argument" == "$SNAP" ]] && return 0
+    previous="$argument"
+  done 2>/dev/null < "/proc/$demo_pid/cmdline"
+  return 1
+}
+
+demo_stop() {
+  local demo_pid demo_start
+  if [[ ! -f "$PIDFILE" ]] || ! read -r demo_pid demo_start < "$PIDFILE" || ! demo_owned; then
+    echo STOPPED_ALREADY
+    return 0
+  fi
+  kill -TERM "$demo_pid" 2>/dev/null
+  local elapsed=0
+  while demo_owned; do
+    if (( elapsed >= ${TERM_GRACE:-30} )); then
+      echo "STOP_STUCK pid=$demo_pid"
+      return 1
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+  rm -f -- "$PIDFILE" || return 1
+  echo STOPPED_CLEAN
+}
+
+exec 9>"$R/output/independent-cnn.lock" || exit 4
+flock -n 9 || { echo INDEPENDENT_CNN_OPERATION_IN_PROGRESS; exit 4; }
+if [[ "${1:-}" == stop ]]; then
+  demo_stop
+  exit $?
+fi
 
 if [ -d "$R/runtime_plugins" ]; then
   PLUGINS="$R/runtime_plugins"
@@ -64,11 +113,8 @@ export AIBOX_WEBRTC_SPLITTER=demux
 . "$R/scripts/vpu_health.sh"
 
 if pgrep -f aibox_stream_pipeline_demo >/dev/null; then
-  echo STOP_PREV
-  pkill -TERM -f aibox_stream_pipeline_demo 2>/dev/null || true
-  i=0
-  while [ "$i" -lt 20 ] && pgrep -f aibox_stream_pipeline_demo >/dev/null; do sleep 1; i=$((i+1)); done
-  if pgrep -f aibox_stream_pipeline_demo >/dev/null; then echo STOP_STUCK; exit 4; fi
+  echo "PIPELINE_ALREADY_RUNNING: stop it with its own stop script first"
+  exit 4
 fi
 
 ss -ltn | grep -q ':4222 ' || { echo NATS_4222_FAIL; exit 5; }
@@ -84,33 +130,28 @@ aibox_graphics_gate_for_start || exit 7
 aibox_vpu_gate_for_start "$R" || exit 8
 
 if [ -n "${AIBOX_RUN_SECONDS:-}" ]; then
-  RUN_ARG="--run-seconds $AIBOX_RUN_SECONDS"
+  run_args=(--run-seconds "$AIBOX_RUN_SECONDS")
 else
-  RUN_ARG="--run-forever"
+  run_args=(--run-forever)
 fi
-echo "RUN_ARG=$RUN_ARG"
+echo "RUN_ARG=${run_args[*]}"
 
-rm -f "$LOG"
-nohup stdbuf -oL -eL "$DEMO" --snapshot "$SNAP" $RUN_ARG >"$LOG" 2>&1 &
-launch_pid=$!
-# Resolve the REAL demo pid for the pid file (comm is truncated to 15 chars).
-# A stale pid file caused STOP_PREV/STOP_STUCK misfires and wrong health
-# checks — the file must always match the live process.
-sleep 1
-real_pid=$(pgrep -x aibox_stream_pi | head -1)
-if [ -n "$real_pid" ] && kill -0 "$real_pid" 2>/dev/null; then
-  echo "$real_pid" >"$OUT/demo.pid"
-else
-  echo "$launch_pid" >"$OUT/demo.pid"
-fi
-echo STARTED_PID=$(cat "$OUT/demo.pid")
+rm -f -- "$PIDFILE" "$LOG" || exit 8
+nohup stdbuf -oL -eL "$DEMO" --snapshot "$SNAP" "${run_args[@]}" >"$LOG" 2>&1 9>&- &
+demo_pid=$!
+demo_start=$(demo_starttime "$demo_pid") || { echo BOOT_DEAD; exit 8; }
+printf '%s %s\n' "$demo_pid" "$demo_start" > "$PIDFILE" || { kill -TERM "$demo_pid"; exit 8; }
+trap 'demo_stop' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+echo "STARTED_PID=$demo_pid"
 
 # P0-2: BOOT_OK is ONLY the verified [PIPELINE_READY] state=PLAYING line —
 # "Setting pipeline to PLAYING" is an intent, not a state confirmation.
 i=0
 while [ "$i" -lt 90 ]; do
   if grep -aq '\[PIPELINE_READY\] state=PLAYING' "$LOG" 2>/dev/null; then echo BOOT_OK; break; fi
-  if ! kill -0 "$(cat "$OUT/demo.pid")" 2>/dev/null; then echo BOOT_DEAD; tail -n 40 "$LOG"; exit 8; fi
+  if [[ "$(demo_starttime "$demo_pid")" != "$demo_start" ]]; then echo BOOT_DEAD; tail -n 40 "$LOG"; exit 8; fi
   # Expert P0: never accept PLAYING on a broken graphics runtime — any
   # Wayland/EGL/GBM init failure in the demo log aborts immediately.
   # Only genuine EGL INIT failures abort the boot here. The overlay's
@@ -126,28 +167,15 @@ grep -aq '\[PIPELINE_READY\] state=PLAYING' "$LOG" || { echo BOOT_TIMEOUT; tail 
 
 i=0
 while [ "$i" -lt 80 ]; do
-  if ! kill -0 "$(cat "$OUT/demo.pid")" 2>/dev/null; then echo AGG_DEAD; tail -n 30 "$LOG"; exit 8; fi
+  if ! demo_owned; then echo AGG_DEAD; tail -n 30 "$LOG"; exit 8; fi
   n=$(grep -ac '\[AGG\]' "$LOG" 2>/dev/null || true); n=${n%%$'\n'*}
   if [ "${n:-0}" -ge "$AGG_NEED" ]; then
     echo "AGG_OK count=$n"
     echo READY_FOR_BROWSER
+    trap - EXIT INT TERM
     exit 0
   fi
   sleep 1; i=$((i+1))
 done
-# P0-3: AGG_TIMEOUT must NOT leave an orphan holding video devices / VPU.
-# SIGTERM the exact pid from demo.pid, bounded wait, then report.
 echo AGG_TIMEOUT
-agg_pid=$(cat "$OUT/demo.pid" 2>/dev/null || true)
-if [ -n "$agg_pid" ] && kill -0 "$agg_pid" 2>/dev/null; then
-  echo "AGG_TIMEOUT_CLEANUP pid=$agg_pid"
-  kill -TERM "$agg_pid" 2>/dev/null || true
-  j=0
-  while [ "$j" -lt 30 ] && kill -0 "$agg_pid" 2>/dev/null; do sleep 1; j=$((j+1)); done
-  if kill -0 "$agg_pid" 2>/dev/null; then
-    echo "AGG_TIMEOUT_TERM_STUCK pid=$agg_pid (needs operator attention)"
-  else
-    echo "AGG_TIMEOUT_CLEANED pid=$agg_pid"
-  fi
-fi
 exit 9

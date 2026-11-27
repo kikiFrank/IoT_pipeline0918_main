@@ -3,6 +3,7 @@
 
 import argparse
 from contextlib import contextmanager
+from copy import deepcopy
 import json
 import os
 from pathlib import Path
@@ -16,9 +17,11 @@ import time
 import tomllib
 from urllib.parse import urlsplit
 
+from rtsp_config import load_split_config
+
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG = Path("config/unified_rtsp.json")
+CONFIG = Path("config_snapshots/unified_rtsp/pipeline_unified_rtsp.txt")
 AGG = re.compile(r"\[AGG\] camera=(\S+) frame=(\d+).*?cam_total=(\d+)")
 SCORE = "[SIGLIP_SCENE_SCORE] "
 TERMINAL = {"passed", "stopped", "failed"}
@@ -36,6 +39,16 @@ def write_json(path, value):
 
 
 def validate(config):
+    profiles = config["cnn"]["profiles"]
+    for name, profile in profiles.items():
+        following = profile.get("then")
+        if following is None:
+            continue
+        if (following == name or following not in profiles
+                or profiles[following].get("then") is not None
+                or any(p["algorithm"]["algorithm"]["type"] != "single"
+                       for p in (profile, profiles[following]))):
+            raise ValueError(f"Invalid serial CNN stages for {name}")
     camera_urls = set()
     for camera_id, camera in config["cameras"].items():
         if not re.fullmatch(r"cam-\d+", camera_id):
@@ -44,11 +57,17 @@ def validate(config):
         if source.scheme != "rtsp" or not source.hostname or camera["source"] in camera_urls:
             raise ValueError(f"Invalid or repeated RTSP source for {camera_id}")
         camera_urls.add(camera["source"])
-        if ("cnn" in camera) == ("scenes" in camera):
-            raise ValueError(f"Set exactly one CNN or SigLIP2 assignment for {camera_id}")
+        if "cnn" not in camera and "scenes" not in camera:
+            raise ValueError(f"Missing CNN or SigLIP2 assignment for {camera_id}")
         if "cnn" in camera:
-            config["cnn"]["profiles"][camera["cnn"]]
+            profiles[camera["cnn"]]
+        if "scenes" not in camera:
             continue
+        if "cnn" in camera:
+            settings = config["cnn"]["settings"]
+            if (settings["timemux"].get("caps_mode") != "canonical_raw"
+                    or str(settings["global"]["batch"]) != "1"):
+                raise ValueError(f"CNN to SigLIP2 requires canonical raw TimeMux for {camera_id}")
         names = camera["scenes"]
         if not names or len(names) != len(set(names)):
             raise ValueError(f"Missing or repeated scene for {camera_id}")
@@ -97,6 +116,11 @@ def render(config, run):
     native.mkdir()
     workers = []
     cnn_cameras = {cam: row for cam, row in config["cameras"].items() if "cnn" in row}
+    frame_sockets = {cam: run / f"{cam}.shm" for cam, row in cnn_cameras.items()
+                     if "scenes" in row}
+    for path in frame_sockets.values():
+        if len(os.fsencode(path)) >= 108:
+            raise ValueError(f"Scene socket path exceeds the Unix socket limit: {path}")
 
     for camera_id, row in config["cameras"].items():
         if "scenes" not in row:
@@ -105,7 +129,9 @@ def render(config, run):
         destination = native / f"{camera_id}.json"
         write_json(destination, {
             "camera_id": camera_id,
-            "rtsp_url": row["source"],
+            **({"frame_socket": os.path.relpath(frame_sockets[camera_id], native),
+                "frame_caps": cnn["settings"]["timemux"]["group_caps"]}
+               if camera_id in frame_sockets else {"rtsp_url": row["source"]}),
             "nats_url": runtime["nats_url"],
             "media_dir": str(ROOT / runtime["media_dir"] / "siglip2"),
             "roi_xyxy": pairs[0]["roi_xyxy"],
@@ -119,7 +145,7 @@ def render(config, run):
                         "argv": [str(ROOT / runtime["siglip_binary"]), str(destination)]})
 
     if cnn_cameras:
-        settings = cnn["settings"]
+        settings = deepcopy(cnn["settings"])
         settings["global"]["enabled_streams"] = len(cnn_cameras)
         artifacts = Path(os.path.relpath(run, ROOT))
         settings["pipeline_output"] = {
@@ -131,9 +157,26 @@ def render(config, run):
         }
         algorithms, models = [], []
         exe_dir = (ROOT / runtime["cnn_binary"]).parent
-        for key in sorted({row["cnn"] for row in cnn_cameras.values()}):
-            profile = cnn["profiles"][key]
-            algorithm = f"{key}-algorithm.txt"
+        profiles = cnn["profiles"]
+        primary = sorted({row["cnn"] for row in cnn_cameras.values()})
+        for key in primary:
+            profile = profiles[key]
+            algorithm = deepcopy(profile["algorithm"])
+            if following := profile.get("then"):
+                second = profiles[following]["algorithm"]
+                algorithm["algorithm"].update(type="serial", stage_count=2)
+                algorithm["stage.2"] = {
+                    **second["stage.1"], "stage_index": 1,
+                    "input_source": f"stage:{algorithm['stage.1']['stage_id']}",
+                    "input_crop": "full", "class_filter": "",
+                }
+                algorithm["stage.2.pipeline"] = second["stage.1.pipeline"]
+            filename = f"{key}-algorithm.txt"
+            write_ini(native / filename, algorithm)
+            algorithms.append(filename)
+        model_profiles = set(primary) | {profiles[key]["then"] for key in primary if "then" in profiles[key]}
+        for key in sorted(model_profiles):
+            profile = profiles[key]
             model = f"{key}-model.txt"
             labels = profile["labels"]
             label_file = native / f"{key}-labels.txt"
@@ -142,25 +185,29 @@ def render(config, run):
                 write_json(label_file, labels)
             else:
                 label_file.write_text("\n".join(labels) + "\n", encoding="utf-8")
-            model_header = profile["model"]["model"]
+            model_settings = deepcopy(profile["model"])
+            model_header = model_settings["model"]
             model_header["model_path"] = os.path.relpath(ROOT / model_header["model_path"], exe_dir)
             model_header["labels_path"] = os.path.relpath(label_file, exe_dir)
-            write_ini(native / algorithm, profile["algorithm"])
-            write_ini(native / model, profile["model"])
-            algorithms.append(algorithm)
+            write_ini(native / model, model_settings)
             models.append(model)
 
         streams = []
         for camera_id, row in cnn_cameras.items():
             algorithm = cnn["profiles"][row["cnn"]]["algorithm"]["algorithm"]["code"]
             filename = f"{camera_id}.txt"
+            stream = {"camera_id": camera_id, "name": camera_id, "enabled": 1,
+                      "source_type": "rtsp", "rtsp_url": row["source"], "encoding": "h264",
+                      **row.get("stream", {})}
+            decode = (cnn["decode"][stream["encoding"]] if "decode" in cnn else {
+                "depay": "rtph264depay", "parse": "h264parse", "decoder": "v4l2h264dec",
+                "output_caps": "video/x-raw,format=NV12",
+            })
             write_ini(native / filename, {
-                "stream": {"camera_id": camera_id, "name": camera_id, "enabled": 1,
-                           "source_type": "rtsp", "rtsp_url": row["source"], "encoding": "h264"},
-                "decode": {"depay": "rtph264depay", "parse": "h264parse", "decoder": "v4l2h264dec",
-                           "output_caps": "video/x-raw,format=NV12"},
+                "stream": stream,
+                "decode": decode,
                 "inference": {"algorithm": algorithm, "frequency": settings["global"]["interval_ms"],
-                              "thresh": 0.5, "drop_policy": "latest"},
+                              "thresh": 0.5, "drop_policy": "latest", **row.get("inference", {})},
             })
             streams.append(filename)
         destination = native / "pipeline.txt"
@@ -168,9 +215,15 @@ def render(config, run):
         with destination.open("a", encoding="utf-8") as out:
             for section, files in (("streams", streams), ("algorithms", algorithms), ("models", models)):
                 out.write(f"\n[{section}]\n" + "".join(f"include={file}\n" for file in files))
-        workers.append({"name": "cnn", "expected": list(cnn_cameras),
-                        "argv": [str(ROOT / runtime["cnn_binary"]), "--snapshot", str(destination),
-                                 "--run-forever", "--media-dir", str(ROOT / runtime["media_dir"])]})
+        args = [str(ROOT / runtime["cnn_binary"]), "--snapshot", str(destination),
+                "--run-forever", "--media-dir", str(ROOT / runtime["media_dir"])]
+        for camera_id, path in frame_sockets.items():
+            args.extend(["--scene-frame-socket", camera_id, str(path)])
+        cnn_worker = {"name": "cnn", "expected": list(cnn_cameras), "argv": args}
+        if frame_sockets:
+            workers.insert(0, cnn_worker)
+        else:
+            workers.append(cnn_worker)
     (native / "rule_engine.fragment.toml").write_text(rule_fragment(config), encoding="utf-8")
     return workers
 
@@ -503,7 +556,8 @@ def main():
     os.chdir(ROOT)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("start", "stop"), nargs="?")
-    parser.add_argument("--config", type=Path, default=CONFIG)
+    parser.add_argument("--config", type=Path, default=CONFIG,
+                        help=f"TXT snapshot entry or legacy JSON (default: {CONFIG})")
     parser.add_argument("--verify-seconds", type=int, default=0,
                         help="Require all workers to stay healthy for this duration, then stop them")
     parser.add_argument("--check", action="store_true")
@@ -515,7 +569,7 @@ def main():
         return 0
     if args.verify_seconds < 0:
         parser.error("--verify-seconds cannot be negative")
-    config = load_json(args.config)
+    config = load_json(args.config) if args.config.suffix.lower() == ".json" else load_split_config(args.config)
     if args.command == "stop":
         return stop(config)
     validate(config)

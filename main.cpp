@@ -55,6 +55,7 @@ struct Args {
   int         tile_h         = 240;
   int         mosaic_cols    = 4;
   std::string media_dir;
+  std::unordered_map<aibox::pipeline::CameraId, std::string> scene_frame_sockets;
 };
 
 static void PrintBanner() {
@@ -81,6 +82,7 @@ static void PrintHelp(const char* prog) {
   std::cout << "  --tile-h <H>              Per-camera tile height (default: 240)" << std::endl;
   std::cout << "  --mosaic-cols <N>         Grid columns (default: 4 → 4x4 for 16 cams)" << std::endl;
   std::cout << "  --media-dir <path>        JPEG snapshot directory (default: $AIBOX_MEDIA_DIR or ./media)" << std::endl;
+  std::cout << "  --scene-frame-socket <camera> <path>   Export post-inference NV12 for one scene camera" << std::endl;
   std::cout << std::endl;
   std::cout << "Examples:" << std::endl;
   const char* example_snapshot = "./config_snapshots/ppe_gesture1123/pipeline_ppe_gesture1121.txt";
@@ -126,6 +128,9 @@ static Args ParseArgs(int argc, char** argv) {
       args.mosaic_cols = std::atoi(argv[++i]);
     } else if (arg == "--media-dir" && i + 1 < argc) {
       args.media_dir = argv[++i];
+    } else if (arg == "--scene-frame-socket" && i + 2 < argc) {
+      const std::string camera = argv[++i];
+      args.scene_frame_sockets[camera] = argv[++i];
     } else {
       std::cerr << "[WARN] Unknown argument: " << arg << std::endl;
     }
@@ -601,6 +606,7 @@ int main(int argc, char** argv) {
   // --- Step 6: GstPipelineBuilder ---
   aibox::pipeline::GstPipelineBuildOptions build_opts;
   build_opts.enable_yolo_stages = true;  // P2/P3: YOLO stages enabled
+  build_opts.scene_frame_sockets = args.scene_frame_sockets;
 
   // Annotated RTSP: enable if configured in [annotated_media] section
   if (plan.annotated_media_config.enabled) {

@@ -1,62 +1,48 @@
 # 测试索引
 
-这里维护可重复执行的核心回归与现役 SigLIP 测试依赖。已完成的现场实验、固定部署包装和诊断脚本已提炼到 [实验逻辑归档](EXPERIMENTS_ARCHIVE.md)，历史实验结果见 [工程知识库](../docs/engineering-notes/README.md)。
+这里维护可重复执行的核心回归和 SigLIP2 告警图片 Worker 的板端验证工具。已退役测试的用途与判据见 [实验逻辑归档](EXPERIMENTS_ARCHIVE.md)。
 
-## 目录
+## CTest 回归
 
-```text
-tests/
-  README.md                       # 当前入口与用途
-  EXPERIMENTS_ARCHIVE.md           # 退役脚本的关键逻辑、判据、逐文件去向
-  unit/                           # 缓存、图片服务与控制契约
-  1stage_andon/                    # 八类后处理合成回归
-  ppe/                            # PPE / Stacklight 共享后处理回归
-  raisehands/                     # 手势 softmax、ROI 与量化回归
-  siglip_worker/                  # Worker 核心、隔离测试与数值对照
-```
+| 源文件 | CTest | 覆盖 |
+| --- | --- | --- |
+| `unit/frame_cache_policy_test.cpp` | `frame_cache_policy_test` | 帧采样、容量、精确与最近帧匹配 |
+| `unit/snapshot_service_test.cpp` | `snapshot_service_test` | 告警抓拍复用、回调和停止竞态 |
+| `unit/pipeline_control_test.cpp` | `pipeline_control_test` | 模拟 GStreamer 管线与 NATS 控制 RPC。通过 `AIBOX_TEST_NATS_URL` 指定隔离的 NATS。未指定地址或连接失败时，CTest 标记跳过 |
+| `postprocess/ppe_gesture_postprocess_test.cpp` | `ppe_gesture_postprocess_test` | 使用统一 PPE 标签和合成张量，检查逐人互斥及帽子、工服保留 |
+| `postprocess/light_postprocess_test.cpp` | `light_postprocess_test` | 使用当前四分类 Light 模块和颜色标签，覆盖类别顺序、颜色、阈值、同类 NMS、FLOAT32 和 UINT16 |
+| `siglip_worker/embedding_outbox_test.cpp` | `siglip_worker_core_test` | 告警图片 Worker 的向量 JSON、PTS、畸形 JPEG 与 outbox 幂等 |
 
-## 保留代码及入口
-
-以下路径相对 `tests/`。CMake 构建目标与 CTest 名称相同，除明确注明的辅助工具外。
-
-| 文件 | 作用 | 入口 / 依赖 |
-|---|---|---|
-| `unit/frame_cache_policy_test.cpp` | FrameSnapshotCache 策略与缓存边界 | `frame_cache_policy_test` |
-| `unit/snapshot_service_test.cpp` | 多告警、图片服务停止及错误回调竞态 | `snapshot_service_test` |
-| `unit/pipeline_control_test.cpp` | 假 GStreamer Pipeline + 真实 NATS 的控制 RPC/生命周期 | `pipeline_control_test`；NATS 不可用时会 SKIP 并返回 0，需检查输出 |
-| `1stage_andon/test_color8_postprocess.cpp` | 八类顺序、shape、错误标签、NMS 与边界 | `color8_postprocess_test`；宏 AIBOX_YOLOX_COLOR8=1 |
-| `ppe/test_yolox_ppe_postprocess.cpp` | PPE/Stacklight 解析、浮点/量化、非法输入、按类别 NMS | `ppe_postprocess_test` 与 `stacklight_postprocess_test`；后者使用 AIBOX_YOLOX_STACKLIGHT=1 |
-| `raisehands/test_gesture.cpp` | 实际 softmax 模块、ROI 外扩/裁剪、输入量化 | `gesture_postprocess_test`；链接 GstElementHelper 与 GStreamer |
-| `siglip_worker/core_test.cpp` | JSON、PTS、JPEG、outbox 和错误契约 | `siglip_worker_core_test` |
-| `siglip_worker/preprocess_probe.cpp` | PrepareImage 数值探针 | 构建目标 `siglip_preprocess_probe`；由数值对照脚本使用，不单独注册 CTest |
-| `siglip_worker/check_preprocess.py` | 五图预处理/QNN 参考对照 | `scripts/siglip/run_board_tests.sh` 调用；需外部参考集 |
-| `siglip_worker/isolated_harness.cpp` | 独立 NATS、mock RPC、消息及消费状态支撑 | 构建目标 `siglip_isolated_harness`；配合 run_isolated.sh |
-| `siglip_worker/run_isolated.sh` | JetStream 重投、失败恢复、幂等、durable 验证 | 现役 run_board_tests.sh 调用；需模型、样图及板端环境 |
-| `siglip_worker/hardware_benchmark.cpp` | SigLIP 硬件推理基准 | 现有构建目标 `siglip_hardware_benchmark`，按需手动运行，不是 CTest |
-
-算法测试直接包含插件模块实现，保持单翻译单元编译；不要再单独链接同一模块实现。标签文件由 CTest 传绝对路径，测试不依赖运行时工作目录。原一次性 build_deploy 包装已删除，四个算法目标已接入主 CMake/CTest。
-
-## 运行
-
-在具备项目依赖的 Linux/板端开发树根目录执行：
+在具备项目依赖的 Linux 开发树根目录执行。下例中的 NATS 地址应指向专用于测试的实例。
 
 ```bash
-cmake -S . -B build_unified -DBUILD_TESTING=ON
-cmake --build build_unified -j3
-ctest --test-dir build_unified --output-on-failure
-# 只执行模型合成回归，不启动真实摄像头或部署程序
-ctest --test-dir build_unified --output-on-failure -R '^(color8|ppe|stacklight|gesture)_postprocess_test$'
+cmake -S . -B build-tests -DBUILD_TESTING=ON
+cmake --build build-tests -j3
+AIBOX_TEST_NATS_URL=nats://127.0.0.1:45223 ctest --test-dir build-tests --output-on-failure
+ctest --test-dir build-tests --output-on-failure -R '^(ppe_gesture|light)_postprocess_test$'
 ```
 
-现役 SigLIP 板端整组入口为 `bash scripts/siglip/run_board_tests.sh`。其 build-review-siglip 输出目录与 `run_isolated.sh`、`check_preprocess.py` 一致。帧缓存运行策略仍由 `frame_cache_policy_test` 覆盖。
+这些测试覆盖代码契约。统一 12 路的 RTSP、4+4 分组和实时场景评分仍通过统一启停入口做板端验收。
 
-SigLIP 依赖 GStreamer/QTI/QNN、NATS/JetStream、模型及外部参考图。`check_preprocess.py`、`run_isolated.sh` 保留现役入口所用目录约定；缺少参考集或硬件不能把它们记作通过。单元/合成回归通过也不等于真实事件到平台展示的业务链验收通过。
+## SigLIP2 告警图片 Worker 板端工具
 
-## 归档与后续维护
+| 源文件 | 入口或用途 |
+| --- | --- |
+| `siglip_worker/prepare_image_probe.cpp` | 构建为 `siglip_preprocess_probe`，导出实际预处理结果 |
+| `siglip_worker/verify_image_preprocess.py` | 对比五张参考图的预处理像素、原生 UINT16 张量和 QNN 向量 |
+| `siglip_worker/nats_worker_test_harness.cpp` | 构建为 `siglip_isolated_harness`，为隔离测试提供 JetStream、模拟 RPC 和状态检查 |
+| `siglip_worker/test_jetstream_redelivery.sh` | 使用指定 JPEG 和临时 JetStream，覆盖重投、幂等、durable 和写盘失败恢复 |
+| `siglip_worker/benchmark_image_encoder.cpp` | 构建为 `siglip_hardware_benchmark`，传入 Worker 配置和 JPEG 测图像编码延迟 |
 
-本次清理已处理原 50 个 tests 文件：保留 12 个源文件/脚本，删除 38 个一次性实验/现场诊断脚本，新增本索引和实验归档。协议、组合验收与运行观测脚本也已提炼后退役；逐文件最终结果、原因及测试矩阵见 [实验逻辑归档](EXPERIMENTS_ARCHIVE.md)，无需查找仓库外的整理清单。
+```bash
+bash scripts/siglip/run_board_tests.sh /path/to/reference_dataset /path/to/sample.jpg
+```
 
-工程知识库中旧脚本路径属于历史来源，以本索引为当前文件清单；退役前源码可从 Git 提交 `b993627` 查阅。
+数值对照需要包含 `data/manifest.jsonl`、源图、预处理原始 RGB 数据和 `results/board_001/image/Result_*/image_embeds.raw` 的参考目录。硬件测试需要 QTI/GStreamer 插件、QNN runtime 和图像编码模型。板端入口构建 `build-review-siglip`，日志写入 `output/siglip_worker`。隔离 JetStream 默认使用本地端口 45223，可通过 `SIGLIP_TEST_NATS_PORT` 修改。
+
+## 已归档的测试
+
+已移除旧 Color8、旧 PPE/Stacklight 和独立 Gesture 的 CTest 注册与源码。Light 回归保留了合成检测、置信度和 NMS 等可复用逻辑，现役 PPE／Gesture 继续使用独立回归。历史用例与实验判据见 [实验逻辑归档](EXPERIMENTS_ARCHIVE.md)，历史源码可从 Git 查阅。
 
 ## 后续需求与 Bug 修复的任务目录规范
 

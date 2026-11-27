@@ -1,0 +1,444 @@
+{
+  "runtime": {
+    "cnn_binary": "build_unified/aibox_stream_pipeline_demo",
+    "siglip_binary": "build_unified/aibox_siglip_scene",
+    "plugin_dir": "runtime_plugins",
+    "ml_modules_dir": "plugins/ml_modules",
+    "state_dir": "output/unified_rtsp",
+    "media_dir": "/var/lib/aibox/media",
+    "nats_url": "nats://127.0.0.1:4222",
+    "startup_timeout_seconds": 100,
+    "cnn_progress_timeout_seconds": 20,
+    "scene_progress_timeout_seconds": 4
+  },
+  "cnn": {
+    "settings": {
+      "global": {
+        "demo_name": "unified_rtsp",
+        "max_streams": "16",
+        "batch": "1",
+        "backend": "qnn",
+        "target": "htp",
+        "soc_id": "77",
+        "interval_ms": "200"
+      },
+      "timemux": {
+        "caps_mode": "canonical_raw",
+        "group_caps": "video/x-raw,format=NV12,width=1920,height=1080,interlace-mode=progressive",
+        "enabled": "1",
+        "plugin": "aiboxtimemux",
+        "max_group_size": "6",
+        "wait_timeout_ms": "200",
+        "drop_policy": "latest",
+        "pad_mode": "request",
+        "attach_meta": "1"
+      },
+      "annotated_media": {
+        "enabled": "1",
+        "bind": "127.0.0.1",
+        "port": "8555",
+        "mount_prefix": "/cam/",
+        "pre_queue_buffers": "30"
+      },
+      "frame_cache": {
+        "min_interval_ms": "150",
+        "max_total_bytes": "536870912"
+      }
+    },
+    "profiles": {
+      "ppe": {
+        "then": "light",
+        "algorithm": {
+          "algorithm": {
+            "code": "ppe_gesture1121",
+            "name": "YOLOX-S ppe_gesture1121 W8A16",
+            "type": "single",
+            "output_type": "detection",
+            "stage_count": "1"
+          },
+          "grouping": {
+            "group_by": "algorithm_signature",
+            "time_mux_enabled": "1",
+            "max_mux_group_size": "6",
+            "batch": "1"
+          },
+          "stage.1": {
+            "stage_id": "ppe_detect",
+            "stage_index": "0",
+            "role": "detector",
+            "model_id": "yolox_s_ppe_w8a16",
+            "input_source": "frame",
+            "input_crop": "full",
+            "preprocess": "yolox1121_letterbox_top_left",
+            "postprocess": "yolox1121_decoded",
+            "class_filter": "",
+            "attach_metadata": "1",
+            "metadata_key": "ppe_detect"
+          },
+          "stage.1.pipeline": {
+            "converter": "qtimlvconverter",
+            "inference": "qtimlqnn",
+            "postprocess": "qtimlpostprocess_roi",
+            "postprocess_module": "yolox-ppe-gesture1121",
+            "output_caps": "text/x-raw,format=utf8"
+          },
+          "sink": {
+            "type": "fakesink",
+            "sync": "false"
+          }
+        },
+        "model": {
+          "model": {
+            "model_id": "yolox_s_ppe_w8a16",
+            "name": "YOLOX-S PPE 1123 W8A16 HTP",
+            "framework": "qnn",
+            "backend": "htp",
+            "model_path": "data/models/ppe1123/yolox_s_ppe_1123_w8a16.bin",
+            "batch": "1"
+          },
+          "input": {
+            "name": "images",
+            "layout": "NHWC",
+            "width": "640",
+            "height": "640",
+            "channels": "3",
+            "dtype": "uint16",
+            "quant_scale": "0.0038910505827516317",
+            "quant_offset": "0"
+          },
+          "preprocess": {
+            "type": "yolox1121_letterbox_top_left",
+            "converter": "qtimlvconverter",
+            "engine": "gles",
+            "image_disposition": "top-left",
+            "subpixel_layout": "reverse",
+            "output_tensor_type": "uint16",
+            "mean": "",
+            "sigma": ""
+          },
+          "output": {
+            "name": "output",
+            "shape": "1,8400,9",
+            "format": "cx,cy,w,h,objectness,p_human,p_white_hat,p_white_cloth,p_gesture",
+            "dtype": "uint16",
+            "class_count": "4"
+          },
+          "postprocess": {
+            "type": "yolox1121_decoded",
+            "plugin": "qtimlpostprocess_roi",
+            "module": "yolox-ppe-gesture1121",
+            "confidence_thresh": "0.7",
+            "nms_iou_thresh": "0.45",
+            "results": "50",
+            "coordinate_restore": "letterbox",
+            "person_only_boxes": "false",
+            "hide_person_label": "false"
+          }
+        },
+        "labels": [
+          "human",
+          "white_hat",
+          "white_cloth",
+          "gesture"
+        ]
+      },
+      "light": {
+        "algorithm": {
+          "algorithm": {
+            "code": "light1121",
+            "name": "YOLOX-S light1121 W8A16",
+            "type": "single",
+            "output_type": "detection",
+            "stage_count": "1"
+          },
+          "grouping": {
+            "group_by": "algorithm_signature",
+            "time_mux_enabled": "1",
+            "max_mux_group_size": "6",
+            "batch": "1"
+          },
+          "stage.1": {
+            "stage_id": "andon_detect",
+            "stage_index": "0",
+            "role": "detector",
+            "model_id": "yolox_s_light_w8a16",
+            "input_source": "frame",
+            "input_crop": "full",
+            "preprocess": "yolox1121_letterbox_top_left",
+            "postprocess": "yolox1121_decoded",
+            "class_filter": "",
+            "attach_metadata": "1",
+            "metadata_key": "andon_detect"
+          },
+          "stage.1.pipeline": {
+            "converter": "qtimlvconverter",
+            "inference": "qtimlqnn",
+            "postprocess": "qtimlpostprocess_roi",
+            "postprocess_module": "yolox-light1121",
+            "output_caps": "text/x-raw,format=utf8"
+          },
+          "sink": {
+            "type": "fakesink",
+            "sync": "false"
+          }
+        },
+        "model": {
+          "model": {
+            "model_id": "yolox_s_light_w8a16",
+            "name": "YOLOX-S light1121 W8A16 HTP",
+            "framework": "qnn",
+            "backend": "htp",
+            "model_path": "data/models/light1121/yolox_s_light_w8a16.bin",
+            "batch": "1"
+          },
+          "input": {
+            "name": "images",
+            "layout": "NHWC",
+            "width": "640",
+            "height": "640",
+            "channels": "3",
+            "dtype": "uint16",
+            "quant_scale": "0.0038910505827516317",
+            "quant_offset": "0"
+          },
+          "preprocess": {
+            "type": "yolox1121_letterbox_top_left",
+            "converter": "qtimlvconverter",
+            "engine": "gles",
+            "image_disposition": "top-left",
+            "subpixel_layout": "reverse",
+            "output_tensor_type": "uint16",
+            "mean": "",
+            "sigma": ""
+          },
+          "output": {
+            "name": "output",
+            "shape": "1,8400,9",
+            "format": "cx,cy,w,h,objectness,p_red,p_yellow,p_green,p_none",
+            "dtype": "uint16",
+            "class_count": "4"
+          },
+          "postprocess": {
+            "type": "yolox1121_decoded",
+            "plugin": "qtimlpostprocess_roi",
+            "module": "yolox-light1121",
+            "confidence_thresh": "0.25",
+            "nms_iou_thresh": "0.65",
+            "results": "50",
+            "coordinate_restore": "letterbox",
+            "person_only_boxes": "false",
+            "hide_person_label": "false"
+          }
+        },
+        "labels": [
+          {
+            "id": 0,
+            "label": "red",
+            "color": "0xFF0000FF"
+          },
+          {
+            "id": 1,
+            "label": "yellow",
+            "color": "0xFFFF00FF"
+          },
+          {
+            "id": 2,
+            "label": "green",
+            "color": "0x00FF00FF"
+          },
+          {
+            "id": 3,
+            "label": "none",
+            "color": "0x808080FF"
+          }
+        ]
+      }
+    }
+  },
+  "siglip2": {
+    "image_encoder": "data/models/siglip2/image_encoder.bin",
+    "text_encoder": "data/models/siglip2/text_encoder.bin",
+    "scenes": {
+      "workstation_organization": {
+        "roi_xyxy": [
+          0.22,
+          0.245,
+          0.74,
+          0.945
+        ],
+        "prompt_version": "experiment-07",
+        "positive": {
+          "text": "The workstation is disorganized, with objects scattered across it.",
+          "input_ids": [1175, 113601, 603, 224158, 235269, 675, 9113, 30390, 4492, 665, 235265, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        },
+        "negative": {
+          "text": "Equipment is aligned neatly on a freshly cleaned workstation.",
+          "input_ids": [63034, 603, 44298, 72724, 611, 476, 51644, 31010, 113601, 235265, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        },
+        "rule": {
+          "recovery_threshold_pp": 15.0,
+          "consecutive_samples": 3,
+          "cool_down_secs": 1,
+          "activation_threshold_pp": 10.0
+        }
+      },
+      "people_gathering": {
+        "roi_xyxy": [
+          0.4114583333333333,
+          0.25,
+          0.7135416666666666,
+          0.7592592592592593
+        ],
+        "prompt_version": "people_gathering-refined-007",
+        "positive": {
+          "text": "People are standing face to face in the factory aisle.",
+          "input_ids": [15565, 708, 9980, 3142, 577, 3142, 575, 573, 11902, 75681, 235265, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        },
+        "negative": {
+          "text": "A few workers are moving along the factory aisle.",
+          "input_ids": [235250, 2619, 8218, 708, 8096, 3731, 573, 11902, 75681, 235265, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        },
+        "rule": {
+          "activation_threshold_pp": 15.0,
+          "recovery_threshold_pp": 15.0,
+          "consecutive_samples": 3,
+          "cool_down_secs": 12
+        }
+      },
+      "material_obstruction": {
+        "roi_xyxy": [
+          0.3229166666666667,
+          0.44907407407407407,
+          0.671875,
+          1.0
+        ],
+        "prompt_version": "material_obstruction-refined-011",
+        "positive": {
+          "text": "A wheeled material bin occupies the center of the factory walkway.",
+          "input_ids": [235250, 138830, 2893, 8881, 68780, 573, 5086, 576, 573, 11902, 132834, 235265, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        },
+        "negative": {
+          "text": "The walking lane in the factory walkway is clear all the way through.",
+          "input_ids": [1175, 10350, 25356, 575, 573, 11902, 132834, 603, 3110, 832, 573, 1703, 1593, 235265, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        },
+        "rule": {
+          "activation_threshold_pp": 8.0,
+          "recovery_threshold_pp": 15.0,
+          "consecutive_samples": 3,
+          "cool_down_secs": 5
+        }
+      },
+      "aisle_cart_obstruction": {
+        "roi_xyxy": [
+          0.4140625,
+          0.37962962962962965,
+          0.7291666666666666,
+          1.0
+        ],
+        "prompt_version": "aisle-obstruction-cart-742-874",
+        "positive": {
+          "text": "A wheeled rack sits in the middle of the factory walkway.",
+          "input_ids": [235250, 138830, 23409, 27505, 575, 573, 7185, 576, 573, 11902, 132834, 235265, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        },
+        "negative": {
+          "text": "The factory walkway between the work areas is clear.",
+          "input_ids": [1175, 11902, 132834, 1865, 573, 1160, 4516, 603, 3110, 235265, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        },
+        "rule": {
+          "activation_threshold_pp": 55,
+          "recovery_threshold_pp": 15,
+          "consecutive_samples": 3,
+          "cool_down_secs": 45,
+          "repeat_reminder": false
+        }
+      },
+      "aisle_box_obstruction": {
+        "roi_xyxy": [
+          0.4140625,
+          0.37962962962962965,
+          0.7291666666666666,
+          1.0
+        ],
+        "prompt_version": "aisle-obstruction-box-1974-2827",
+        "positive": {
+          "text": "A black rectangular box occupies the center of the factory walkway.",
+          "input_ids": [235250, 2656, 37559, 3741, 68780, 573, 5086, 576, 573, 11902, 132834, 235265, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        },
+        "negative": {
+          "text": "The factory walkway between the machines is clear.",
+          "input_ids": [1175, 11902, 132834, 1865, 573, 15051, 603, 3110, 235265, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        },
+        "rule": {
+          "activation_threshold_pp": 55,
+          "recovery_threshold_pp": 15,
+          "consecutive_samples": 3,
+          "cool_down_secs": 45,
+          "repeat_reminder": false
+        }
+      }
+    }
+  },
+  "cameras": {
+    "cam-001": {
+      "source": "rtsp://192.168.50.140:8556/cam-016",
+      "cnn": "ppe"
+    },
+    "cam-002": {
+      "source": "rtsp://192.168.50.140:8556/cam-032",
+      "cnn": "ppe"
+    },
+    "cam-003": {
+      "source": "rtsp://192.168.50.140:8556/cam-035",
+      "cnn": "light"
+    },
+    "cam-004": {
+      "source": "rtsp://192.168.50.140:8556/cam-022",
+      "cnn": "light"
+    },
+    "cam-005": {
+      "source": "rtsp://192.168.50.140:8556/cam-023",
+      "cnn": "light"
+    },
+    "cam-006": {
+      "source": "rtsp://192.168.50.140:8556/cam-024",
+      "cnn": "light"
+    },
+    "cam-007": {
+      "cnn": "light",
+      "source": "rtsp://192.168.50.140:8556/cam-021",
+      "scenes": [
+        "aisle_cart_obstruction",
+        "aisle_box_obstruction"
+      ]
+    },
+    "cam-008": {
+      "source": "rtsp://192.168.50.140:8556/cam-026",
+      "cnn": "ppe"
+    },
+    "cam-009": {
+      "cnn": "light",
+      "source": "rtsp://192.168.50.140:8556/cam-027",
+      "scenes": [
+        "people_gathering"
+      ]
+    },
+    "cam-010": {
+      "cnn": "light",
+      "source": "rtsp://192.168.50.140:8556/cam-041",
+      "scenes": [
+        "material_obstruction"
+      ]
+    },
+    "cam-011": {
+      "cnn": "light",
+      "source": "rtsp://192.168.50.140:8556/cam-048",
+      "scenes": [
+        "workstation_organization"
+      ]
+    },
+    "cam-012": {
+      "source": "rtsp://192.168.50.140:8556/cam-049",
+      "cnn": "ppe"
+    }
+  }
+}

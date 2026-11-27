@@ -103,5 +103,5 @@ assert logits.shape == (8,) and all_finite(logits)
 
 - 历史来源（整理前文件，已删除）：`docs/` 下的 `PPE_YOLOX_4cam_Status.md`、`Andon_YOLOX_MobileNetV2_4cam_Status.md`、`Andon_Model_Replacement_20261102.md`、`1stage_andon_4cam_20261103.md`、`Raisehands_4cam_20261103.md`、`已知问题后续要深究.md`；可在本仓库 `b993627` 查阅。
 - 历史脚本（已退役，方法已归档）：原 `tests/andon/` 探针与数值校验脚本，见 [实验逻辑归档](../../tests/EXPERIMENTS_ARCHIVE.md)。
-- 当前保留的算法测试：[八类 Andon](../../tests/1stage_andon/test_color8_postprocess.cpp)、[PPE/Stacklight](../../tests/ppe/test_yolox_ppe_postprocess.cpp)、[手势](../../tests/raisehands/test_gesture.cpp)；运行入口见 [测试索引](../../tests/README.md)。
+- 当前后处理回归见 [PPE／Gesture](../../tests/postprocess/ppe_gesture_postprocess_test.cpp) 和 [Light](../../tests/postprocess/light_postprocess_test.cpp)。旧 Color8、Stacklight 和独立 Gesture 用例见 [实验逻辑归档](../../tests/EXPERIMENTS_ARCHIVE.md)。
 - 旧仓库历史来源（非本仓库当前路径）：`IoT_pipeline_0918` `486d0c3` 的 `plan/{build_record.md,model_replacement_guide.md,INDEX.md}` 与 `plugins/qtimlqnn_github/qualcomm_qnn_batch1_09122026/README.md`。

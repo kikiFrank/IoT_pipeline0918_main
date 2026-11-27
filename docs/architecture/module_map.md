@@ -21,7 +21,7 @@
 | `plugins/` | 独立 CMake 插件项目及后处理模块 | ABI、factory、pads/caps、线程 |
 | `contracts/imsdk/1.0/` | aibox_contracts.proto | 根 CMake 生成 Protobuf，跨语言 tag 兼容 |
 | `tools/rtsp_supervisor.py` | 统一启停、配置生成、进程所有权与每路进展监测 | 启动门禁与状态、日志 |
-| `config/unified_rtsp.json` | 主工作区统一 RTSP 配置，含模型、场景、摄像头 | 运行分配和配置渲染 |
+| `config_snapshots/unified_rtsp/pipeline_unified_rtsp.txt` | 统一 RTSP 配置入口，引用分开的摄像头、算法、模型和场景 | 运行分配和配置渲染 |
 | `config_snapshots/` | 按场景拆分 pipeline/stream/algorithm/model/labels | 示例配置不是任意设备默认值 |
 | `data/` | 模型/资源；部分大文件未入库 | 配置路径、真实资产身份 |
 | `output/` | 本地产物 | 不当作源码/当前板端验收证据 |
@@ -42,15 +42,15 @@ FrameMeta common 是共享库与元数据注册插件，不是带 sink/src pad �
 | `scripts/systemd/aibox-weston.service` | 供 GLES 预处理使用的专用 headless Wayland 服务 |
 | `scripts/webrtc_start_common.sh` | 场景公共启动、图形/VPU gate、READY 与 AGG 检查 |
 | `scripts/_start_adreno_weston_forceon.sh` | 统一与独立 CNN 入口共用的专用 Weston 服务检查及按需启动 |
-| `scripts/ppe_gesture1121/ppe_gesture1121_start.sh`、`scripts/ppe_gesture1121/ppe_gesture1121_stop.sh` | 独立 PPE／手势启停，加载 `config_snapshots/ppe_gesture1123/pipeline_ppe_gesture1121.txt` |
-| `scripts/light1121/light1121_start.sh`、`scripts/light1121/light1121_stop.sh` | 独立 Light 启停，加载 `config_snapshots/light1121/pipeline_light1121.txt` |
+| `scripts/ppe_gesture/ppe_gesture_start.sh`、`scripts/ppe_gesture/ppe_gesture_stop.sh` | 独立 PPE／手势启停，加载 `config_snapshots/ppe_gesture1123/pipeline_ppe_gesture1121.txt` |
+| `scripts/light/light_start.sh`、`scripts/light/light_stop.sh` | 独立 Light 启停，加载 `config_snapshots/light1121/pipeline_light1121.txt` |
 | `scripts/siglip/siglip_start.sh`、`siglip_stop.sh`、`worker_process.sh` | Worker 独立启动/停止及进程身份辅助 |
 | `scripts/siglip/run_board_tests.sh` | 当前 SigLIP 板端测试入口 |
 | `scripts/vpu_health.sh` | 资源检查与按策略调用 reset_vpu.sh，不能只按名字理解为只读 |
 
 ## 4. 当前测试与文档（verified）
 
-`tests/unit/` 保留缓存、媒体和控制相关测试。`tests/ppe/`、`tests/1stage_andon/`、`tests/raisehands/` 保留算法回归。`tests/siglip_worker/` 保留告警图片 Worker 测试。当前 PPE 使用 1123 模型，后处理模块和对应回归仍沿用 `1121` 命名。入口和历史实验分别见 [测试 README](../../tests/README.md) 与 [实验归档](../../tests/EXPERIMENTS_ARCHIVE.md)。
+`tests/unit/` 保留缓存、媒体和控制相关测试。`tests/postprocess/` 保留现役 PPE／Gesture 和 Light 后处理回归。`tests/siglip_worker/` 保留告警图片 Worker 测试。当前 PPE 使用 1123 模型，后处理模块和对应回归仍沿用 `1121` 命名。入口和历史实验分别见 [测试 README](../../tests/README.md) 与 [实验归档](../../tests/EXPERIMENTS_ARCHIVE.md)。
 
 新需求/修复按功能任务目录组织脚本、日志和报告，具体规则沿用 tests README。架构、经验、ADR、正式验收分别由 [docs 总索引](../README.md) 定义，不移动现有业务目录来迁就文档。
 
